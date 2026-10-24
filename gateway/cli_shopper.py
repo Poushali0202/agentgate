@@ -30,7 +30,7 @@ def load_key(keyid: str) -> Ed25519PrivateKey:
             return serialization.load_pem_private_key(f.read(), password=None)
     key = Ed25519PrivateKey.generate()
     os.makedirs(KEY_DIR, exist_ok=True)
-    with open(path, "wb") as f:
+    with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb") as f:
         f.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     return key
 
@@ -70,6 +70,9 @@ def main() -> int:
             headers["X-AgentGate-Scenario"] = args.scenario
         r = http.post(url, content=body, headers=headers)
         out = r.json()
+        if "decision" not in out:
+            print(f"checkout  {r.status_code}  {out.get('detail', out)}")
+            return 1
         print(f"checkout  {r.status_code}  {out['decision']}  "
               f"score={out.get('risk_score', '-')}  reasons={out.get('reasons', '-')}  latency={out.get('latency_ms', '-')}ms")
 
@@ -77,12 +80,12 @@ def main() -> int:
             return 0 if out["decision"] == "allow" else 1
 
         cid = out["challenge_id"]
-        print(f"challenge {cid}: waiting for the Guardian (POST {g}/challenge/{cid}/resolve)")
+        print(f"challenge {cid}: waiting for the Guardian")
         deadline = time.time() + args.wait
         while time.time() < deadline:
             status = http.get(f"{g}/challenge/{cid}").json()
             if status["status"] != "pending":
-                print(f"resolved  {status['status']}  reasons={status['reasons']}")
+                print(f"resolved  {status['status']}  outcome={status['outcome']}")
                 return 0 if status["status"] == "allow" else 1
             time.sleep(1)
         print("still pending")

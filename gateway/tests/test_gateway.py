@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from gateway import app as gw
 from gateway import db, latency, security_tests
+from gateway.directory import Directory
 from gateway.signer import BROWSER_TAG, PAYER_TAG, public_jwk, sign_request
 
 BASE = "http://testserver"
@@ -24,9 +25,17 @@ def test_security_case(name):
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("GATEWAY_DB_PATH", str(tmp_path / "events.db"))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "events.db"))
-    monkeypatch.setattr(gw.directory, "path", str(tmp_path / "directory.json"))
+    fresh = Directory(str(tmp_path / "directory.json"))
+    monkeypatch.setattr(gw, "directory", fresh)
+    monkeypatch.setattr(gw.verifier, "directory", fresh)
+    monkeypatch.setattr(gw, "GUARDIAN_TOKEN", "guardian-secret")
+    monkeypatch.setattr(gw, "challenges", {})
     with TestClient(gw.app) as c:
+        assert (tmp_path / "events.db").exists()  # tests must not write to the real event log
         yield c
+
+
+GUARDIAN = {"Authorization": "Bearer guardian-secret"}
 
 
 @pytest.fixture
@@ -87,14 +96,22 @@ def test_challenge_flow(client, agent, monkeypatch, approved, final):
     assert sent and sent[0]["challenge_id"] == cid
 
     assert client.get(f"/challenge/{cid}").json()["status"] == "pending"
-    assert any(c["challenge_id"] == cid for c in client.get("/challenges?status=pending").json())
+    assert any(c["challenge_id"] == cid for c in client.get("/challenges?status=pending", headers=GUARDIAN).json())
 
-    r = client.post(f"/challenge/{cid}/resolve", json={"approved": approved})
+    # The shopper got the challenge_id but not the Guardian token: it can't approve itself or read the details.
+    assert client.post(f"/challenge/{cid}/resolve", json={"approved": True}).status_code == 401
+    assert client.post(f"/challenge/{cid}/resolve", json={"approved": True},
+                       headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/challenges").status_code == 401
+
+    r = client.post(f"/challenge/{cid}/resolve", json={"approved": approved}, headers=GUARDIAN)
     assert r.json()["decision"] == final
     assert r.json()["challenge_id"] == cid
-    assert client.get(f"/challenge/{cid}").json()["status"] == final
-    assert client.post(f"/challenge/{cid}/resolve", json={"approved": approved}).status_code == 409
-    assert client.post("/challenge/nope/resolve", json={"approved": True}).status_code == 404
+    status = client.get(f"/challenge/{cid}").json()
+    assert status["status"] == final and status["outcome"] in ("human_approved", "human_denied")
+    assert "reasons" not in status  # shopper learns the outcome, not the risk reasons
+    assert client.post(f"/challenge/{cid}/resolve", json={"approved": approved}, headers=GUARDIAN).status_code == 409
+    assert client.post("/challenge/nope/resolve", json={"approved": True}, headers=GUARDIAN).status_code == 404
 
 
 def test_unanswered_challenge_times_out(client, agent, monkeypatch):
@@ -103,7 +120,7 @@ def test_unanswered_challenge_times_out(client, agent, monkeypatch):
     cid = signed_checkout(client, agent).json()["challenge_id"]
     monkeypatch.setattr(gw, "CHALLENGE_TTL_S", -1)
     status = client.get(f"/challenge/{cid}").json()
-    assert status["status"] == "block" and status["reasons"][0] == "guardian_timeout"
+    assert status["status"] == "block" and status["outcome"] == "guardian_timeout"
 
 
 async def _noop():
@@ -117,17 +134,28 @@ def test_webhook_retries_then_delivers(monkeypatch):
         def __init__(self, **kw): pass
         async def __aenter__(self): return self
         async def __aexit__(self, *a): pass
-        async def post(self, url, json):
-            calls.append(url)
+        async def post(self, url, json, headers=None):
+            calls.append(headers)
             status = 500 if len(calls) < 2 else 200
             return httpx.Response(status, request=httpx.Request("POST", url))
 
     monkeypatch.setattr(gw, "CHALLENGE_WEBHOOK_URL", "http://guardian.test/challenge")
+    monkeypatch.setattr(gw, "GUARDIAN_TOKEN", "guardian-secret")
+    monkeypatch.setattr(gw, "challenges", {})
     monkeypatch.setattr(gw.httpx, "AsyncClient", FlakyClient)
     monkeypatch.setattr(gw.asyncio, "sleep", lambda s: _noop())
     gw.challenges["cid-1"] = {"event": {}, "status": "pending", "created": 0, "webhook": "pending", "final": None}
     asyncio.run(gw._fire_webhook({"challenge_id": "cid-1"}))
     assert len(calls) == 2 and gw.challenges["cid-1"]["webhook"] == "delivered"
+    assert calls[0] == {"Authorization": "Bearer guardian-secret"}  # Guardian can trust the sender
+
+
+def test_webhook_bad_url_ends_failed(monkeypatch):
+    monkeypatch.setattr(gw, "CHALLENGE_WEBHOOK_URL", "not a url")
+    monkeypatch.setattr(gw.asyncio, "sleep", lambda s: _noop())
+    monkeypatch.setattr(gw, "challenges", {"cid-2": {"webhook": "pending"}})
+    asyncio.run(gw._fire_webhook({"challenge_id": "cid-2"}))
+    assert gw.challenges["cid-2"]["webhook"] == "failed"
 
 
 def test_stats_excludes_resolutions():
@@ -138,5 +166,44 @@ def test_stats_excludes_resolutions():
     assert s["decisions"] == {"allow": 100, "block": 1}
 
 
+def test_resolve_disabled_without_token(client, monkeypatch):
+    monkeypatch.setattr(gw, "GUARDIAN_TOKEN", None)
+    assert client.post("/challenge/x/resolve", json={"approved": True}, headers=GUARDIAN).status_code == 503
+
+
+def test_kid_takeover_refused(client, agent):
+    attacker = Ed25519PrivateKey.generate()
+    assert client.post("/directory/keys", json=public_jwk(attacker.public_key(), "shopper-test")).status_code == 409
+    assert client.post("/directory/keys", json=public_jwk(agent.public_key(), "shopper-test")).status_code == 200
+    assert signed_checkout(client, agent).json()["decision"] == "allow"
+
+
+@pytest.mark.parametrize("bad", [
+    {**ORDER, "cart": [{"sku": "GC-901", "qty": 5}, {"sku": "GC-900", "qty": -24}]},
+    {**ORDER, "cart": [{"sku": "HP-100", "qty": 0}]},
+    {**ORDER, "cart": [{"sku": "HP-100", "qty": 10**9}]},
+    {**ORDER, "cart": []},
+    {**ORDER, "cart": [{"sku": "NOPE", "qty": 1}]},
+    {**ORDER, "ship_to": 123},
+    {**ORDER, "consumer_id": {"a": 1}},
+])
+def test_bad_orders_rejected_without_burning_nonce(client, agent, bad):
+    body = json.dumps(bad).encode()
+    headers = {**sign_request(agent, "shopper-test", "POST", f"{BASE}/checkout", body, tag=PAYER_TAG),
+               "Content-Type": "application/json"}
+    assert client.post("/checkout", content=body, headers=headers).status_code == 400
+
+
 def test_security_tests_endpoint(client):
     assert client.get("/security-tests").json()["passed"] == 5
+
+
+def test_missing_teammate_module_uses_placeholder():
+    assert gw._optional_module("gateway.not_written_yet") is None
+
+
+def test_broken_teammate_module_fails_loudly(tmp_path, monkeypatch):
+    (tmp_path / "broken_scoring.py").write_text("import not_a_real_package\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    with pytest.raises(ModuleNotFoundError):
+        gw._optional_module("broken_scoring")

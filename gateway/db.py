@@ -17,8 +17,9 @@ _conn: sqlite3.Connection | None = None
 _last_browse: dict[tuple[str, str], float] = {}
 
 
-def init(path: str = DB_PATH) -> None:
+def init(path: str | None = None) -> None:
     global _conn
+    path = path or DB_PATH  # read at call time so tests can point DB_PATH elsewhere
     if path != ":memory:":
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     _conn = sqlite3.connect(path, check_same_thread=False)
