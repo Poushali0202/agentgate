@@ -90,4 +90,16 @@ History helpers for scoring, in `gateway/db.py`:
 
 Also available: `gateway.app.directory.first_seen(keyid)` for `young_key`, and `gateway.store.get_product(sku)` for categories and `limited`.
 
-**Challenges.** On `challenge`, the gateway POSTs the full event to `CHALLENGE_WEBHOOK_URL`. The Guardian answers with `POST /challenge/{id}/resolve {"approved": bool}`. That logs a second event with the same `challenge_id` and decision `allow` or `block`, whose first reason is `human_approved` or `human_denied`. So a challenge shows up as two events in `/events`; count them per `challenge_id`.
+**Challenges.** On `challenge`, the gateway POSTs the full event to `CHALLENGE_WEBHOOK_URL` (3 tries with backoff). Endpoints:
+
+| Who | Call | Purpose |
+|---|---|---|
+| Guardian | `POST /challenge/{id}/resolve {"approved": bool}` | Answer the challenge. 404 if the id is unknown, 409 if it is already resolved. |
+| Guardian (fallback) | `GET /challenges?status=pending` | Poll for open challenges if the webhook can't reach you. Each row includes the full event and `webhook` delivery status. |
+| Shopper | `GET /challenge/{id}` | Poll the outcome: `{"status": "pending" \| "allow" \| "block", "reasons": [...]}`. |
+
+Resolving logs a second event with the same `challenge_id` and decision `allow` or `block`, whose first reason is `human_approved` or `human_denied`. A challenge nobody answers within `CHALLENGE_TTL_S` (default 900 s) is blocked with `guardian_timeout`. So a challenge shows up as two events in `/events`; count them per `challenge_id`.
+
+**Ops.**
+- `GET /stats` gives decision counts and p50/p95/p99 `latency_ms` (verify → score → decide; resolutions excluded). Run `python -m gateway.latency` for the same numbers from the command line.
+- `python -m gateway.cli_shopper --sku HP-100 [--unsigned] [--scenario good]` is a signed shopper you can run from the terminal, for testing without the Fetch.ai agent.
