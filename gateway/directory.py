@@ -40,9 +40,17 @@ class Directory:
             self._first_seen.setdefault(keyid, time.time())
 
     def register_jwk(self, jwk: dict, persist: bool = True) -> None:
+        """Raises ValueError for a malformed JWK, KeyError if the kid is already bound to a different key."""
         if jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not jwk.get("kid") or not jwk.get("x"):
             raise ValueError("expected an Ed25519 OKP JWK with kid and x")
-        self.register(jwk["kid"], Ed25519PublicKey.from_public_bytes(_b64url_decode(jwk["x"])))
+        try:
+            new_key = Ed25519PublicKey.from_public_bytes(_b64url_decode(jwk["x"]))
+        except Exception:
+            raise ValueError("x is not a valid Ed25519 public key")
+        existing = self._keys.get(jwk["kid"])
+        if existing is not None and public_jwk(existing, jwk["kid"])["x"] != public_jwk(new_key, jwk["kid"])["x"]:
+            raise KeyError(f"kid {jwk['kid']} is already registered to a different key")
+        self.register(jwk["kid"], new_key)
         if persist and self.path:
             with self._lock:
                 self._persisted[jwk["kid"]] = public_jwk(self._keys[jwk["kid"]], jwk["kid"])

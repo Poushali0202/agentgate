@@ -65,7 +65,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from gateway.signer import sign_request, public_jwk, PAYER_TAG, BROWSER_TAG
 
 key = Ed25519PrivateKey.generate()
-httpx.post("http://localhost:8000/directory/keys", json=public_jwk(key.public_key(), "shopper-1"))  # register once
+httpx.post("http://localhost:8000/directory/keys", json=public_jwk(key.public_key(), "shopper-1"))  # register once; 409 if that kid has a different key
 
 body = json.dumps({"consumer_id": "c-1", "card_fp": "card_abc", "ship_to": "1 Main St",
                    "cart": [{"sku": "HP-100", "qty": 1}]}).encode()
@@ -74,7 +74,7 @@ httpx.post("http://localhost:8000/checkout", content=body, headers={**headers, "
 ```
 
 - `GET /browse?consumer_id=...&q=...` is signed with `BROWSER_TAG` or `PAYER_TAG`. `POST /checkout` must use `PAYER_TAG`.
-- The checkout body gives `cart` as `[{sku, qty}]`. Prices come from the store, never from the client. `ship_to` is a raw address; the gateway hashes it.
+- The checkout body gives `cart` as `[{sku, qty}]`, with `qty` from 1 to 100. Bad bodies get a 400 without using up the signature's nonce. Prices come from the store, never from the client. `ship_to` is a raw address; the gateway hashes it.
 - Responses: `allow` → 200 + event; `block` → 403 + event; `challenge` → 202 + `{"decision": "challenge", "challenge_id"}` only.
 - Simulator ground truth goes in the header `X-AgentGate-Scenario: good|spoof|scalper|hijacked|slow_low`. Scoring never sees it.
 
@@ -90,13 +90,13 @@ History helpers for scoring, in `gateway/db.py`:
 
 Also available: `gateway.app.directory.first_seen(keyid)` for `young_key`, and `gateway.store.get_product(sku)` for categories and `limited`.
 
-**Challenges.** On `challenge`, the gateway POSTs the full event to `CHALLENGE_WEBHOOK_URL` (3 tries with backoff). Endpoints:
+**Challenges.** On `challenge`, the gateway POSTs the full event to `CHALLENGE_WEBHOOK_URL` (3 tries with backoff), with `Authorization: Bearer $GUARDIAN_TOKEN`. Guardian endpoints need the same header. The shopper never has the token, so a hijacked shopper can't approve its own purchase. Without `GUARDIAN_TOKEN` set, resolving returns 503.
 
 | Who | Call | Purpose |
 |---|---|---|
-| Guardian | `POST /challenge/{id}/resolve {"approved": bool}` | Answer the challenge. 404 if the id is unknown, 409 if it is already resolved. |
-| Guardian (fallback) | `GET /challenges?status=pending` | Poll for open challenges if the webhook can't reach you. Each row includes the full event and `webhook` delivery status. |
-| Shopper | `GET /challenge/{id}` | Poll the outcome: `{"status": "pending" \| "allow" \| "block", "reasons": [...]}`. |
+| Guardian (token) | `POST /challenge/{id}/resolve {"approved": bool}` | Answer the challenge. 401 without the token, 404 if the id is unknown, 409 if it is already resolved. |
+| Guardian (token) | `GET /challenges?status=pending` | Fallback if the webhook can't reach you: poll for open challenges. Each row includes the full event and `webhook` delivery status. |
+| Shopper | `GET /challenge/{id}` | Poll the outcome: `{"status": "pending" \| "allow" \| "block", "outcome": "human_approved" \| "human_denied" \| "guardian_timeout" \| null}`. Risk reasons are never shown to the shopper. |
 
 Resolving logs a second event with the same `challenge_id` and decision `allow` or `block`, whose first reason is `human_approved` or `human_denied`. A challenge nobody answers within `CHALLENGE_TTL_S` (default 900 s) is blocked with `guardian_timeout`. So a challenge shows up as two events in `/events`; count them per `challenge_id`.
 
