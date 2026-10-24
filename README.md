@@ -35,14 +35,6 @@ investigator/ Claude with one read-only tool over the decision log: "why was the
 
 Python · FastAPI · `cryptography` (Ed25519) · Fetch.ai uAgents + Agentverse + ASI:One · Anthropic Claude · Apify · SQLite
 
-## Status
-
-Day one. Repo initialised; build in progress. See `AGENTGATE_PLAN.md` once it lands for the build plan and ownership.
-
-## Team
-
-Four people. Names and roles to be added.
-
 ## Honest disclosures
 
 - Training and test traffic is synthetic, produced by our simulator.
