@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from gateway import db, security_tests, store
+from gateway import db, latency, security_tests, store
 from gateway.directory import Directory
 from gateway.verify import Verifier
 
@@ -39,12 +39,15 @@ except ImportError:
         return "allow" if risk_score < 30 else "challenge" if risk_score < 70 else "block"
 
 CHALLENGE_WEBHOOK_URL = os.environ.get("CHALLENGE_WEBHOOK_URL")
+CHALLENGE_TTL_S = float(os.environ.get("CHALLENGE_TTL_S", "900"))
+WEBHOOK_ATTEMPTS = 3
 DIRECTORY_PATH = os.environ.get("GATEWAY_DIRECTORY_PATH", "gateway/data/directory.json")
 DASHBOARD = os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")
 
 directory = Directory(DIRECTORY_PATH)
 verifier = Verifier(directory)
-pending_challenges: dict[str, dict] = {}
+# challenge_id -> {"event", "status": pending|allow|block, "created", "webhook": pending|delivered|failed|disabled, "final"}
+challenges: dict[str, dict] = {}
 
 
 @asynccontextmanager
@@ -82,13 +85,46 @@ def _verify(request: Request, body: bytes):
 
 
 async def _fire_webhook(event: dict) -> None:
+    """POST the challenge to the Guardian, retrying with backoff. Outcome is visible on GET /challenges."""
+    ch = challenges[event["challenge_id"]]
     if not CHALLENGE_WEBHOOK_URL:
+        ch["webhook"] = "disabled"
         return
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            await client.post(CHALLENGE_WEBHOOK_URL, json=event)
-    except httpx.HTTPError as e:
-        log.warning("challenge webhook failed: %s", e)
+    for attempt in range(WEBHOOK_ATTEMPTS):
+        try:
+            async with httpx.AsyncClient(timeout=3) as client:
+                (await client.post(CHALLENGE_WEBHOOK_URL, json=event)).raise_for_status()
+            ch["webhook"] = "delivered"
+            return
+        except httpx.HTTPError as e:
+            log.warning("challenge webhook attempt %d failed: %s", attempt + 1, e)
+            await asyncio.sleep(0.5 * 2 ** attempt)
+    ch["webhook"] = "failed"
+
+
+def _resolve(challenge_id: str, decision: str, first_reason: str, t0: float) -> dict:
+    """Close a challenge: log a follow-up event with the same challenge_id and the final decision."""
+    ch = challenges[challenge_id]
+    original = ch["event"]
+    event = {
+        **original,
+        "request_id": str(uuid.uuid4()),
+        "ts": _now_iso(),
+        "reasons": [first_reason] + original["reasons"][:2],
+        "decision": decision,
+    }
+    event["latency_ms"] = round((time.perf_counter() - t0) * 1000, 3)
+    db.insert_event(event)
+    ch.update(status=decision, final=event)
+    return event
+
+
+def _expire_stale() -> None:
+    """A challenge nobody answers within CHALLENGE_TTL_S is blocked."""
+    cutoff = time.time() - CHALLENGE_TTL_S
+    for cid, ch in list(challenges.items()):
+        if ch["status"] == "pending" and ch["created"] < cutoff:
+            _resolve(cid, "block", "guardian_timeout", time.perf_counter())
 
 
 # --- Directory & store -------------------------------------------------------
@@ -128,6 +164,7 @@ async def browse(request: Request, consumer_id: str = "", q: str = ""):
 
 @app.post("/checkout")
 async def checkout(request: Request):
+    _expire_stale()
     t0 = time.perf_counter()
     body = await request.body()
     v = _verify(request, body)
@@ -172,7 +209,8 @@ async def checkout(request: Request):
 
     if event["decision"] == "challenge":
         event["challenge_id"] = str(uuid.uuid4())
-        pending_challenges[event["challenge_id"]] = event
+        challenges[event["challenge_id"]] = {"event": event, "status": "pending", "created": time.time(),
+                                             "webhook": "pending", "final": None}
 
     event["latency_ms"] = round((time.perf_counter() - t0) * 1000, 3)
     db.insert_event(event)
@@ -192,20 +230,35 @@ class Resolution(BaseModel):
 def resolve_challenge(challenge_id: str, resolution: Resolution):
     """Guardian's answer. Logs a follow-up event with the same challenge_id: allow on approve, block on deny."""
     t0 = time.perf_counter()
-    original = pending_challenges.pop(challenge_id, None)
-    if original is None:
-        raise HTTPException(404, "unknown or already resolved challenge")
-    first = "human_approved" if resolution.approved else "human_denied"
-    event = {
-        **original,
-        "request_id": str(uuid.uuid4()),
-        "ts": _now_iso(),
-        "reasons": [first] + original["reasons"][:2],
-        "decision": "allow" if resolution.approved else "block",
-    }
-    event["latency_ms"] = round((time.perf_counter() - t0) * 1000, 3)
-    db.insert_event(event)
-    return event
+    _expire_stale()
+    ch = challenges.get(challenge_id)
+    if ch is None:
+        raise HTTPException(404, "unknown challenge")
+    if ch["status"] != "pending":
+        raise HTTPException(409, f"challenge already resolved: {ch['status']}")
+    if resolution.approved:
+        return _resolve(challenge_id, "allow", "human_approved", t0)
+    return _resolve(challenge_id, "block", "human_denied", t0)
+
+
+@app.get("/challenge/{challenge_id}")
+def challenge_status(challenge_id: str):
+    """For the shopper agent to poll: pending until the Guardian answers, then allow or block."""
+    _expire_stale()
+    ch = challenges.get(challenge_id)
+    if ch is None:
+        raise HTTPException(404, "unknown challenge")
+    reasons = ch["final"]["reasons"] if ch["final"] else []
+    return {"challenge_id": challenge_id, "status": ch["status"], "reasons": reasons}
+
+
+@app.get("/challenges")
+def list_challenges(status: str | None = None):
+    """Guardian fallback if the webhook can't reach it: poll ?status=pending. Newest first."""
+    _expire_stale()
+    rows = [{"challenge_id": cid, "status": ch["status"], "webhook": ch["webhook"], "event": ch["event"]}
+            for cid, ch in reversed(challenges.items()) if status is None or ch["status"] == status]
+    return rows
 
 
 # --- Ops ---------------------------------------------------------------------
@@ -213,6 +266,12 @@ def resolve_challenge(challenge_id: str, resolution: Resolution):
 @app.get("/events")
 def events(limit: int = 100):
     return db.recent_events(min(max(limit, 1), 1000))
+
+
+@app.get("/stats")
+def stats():
+    """Decision counts and verify -> score -> decide latency (p50/p95/p99) over the whole log."""
+    return latency.summary(db.all_events())
 
 
 @app.get("/security-tests")

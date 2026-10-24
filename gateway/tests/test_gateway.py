@@ -1,11 +1,13 @@
+import asyncio
 import json
 
+import httpx
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
 from gateway import app as gw
-from gateway import db, security_tests
+from gateway import db, latency, security_tests
 from gateway.signer import BROWSER_TAG, PAYER_TAG, public_jwk, sign_request
 
 BASE = "http://testserver"
@@ -84,10 +86,56 @@ def test_challenge_flow(client, agent, monkeypatch, approved, final):
     cid = r.json()["challenge_id"]
     assert sent and sent[0]["challenge_id"] == cid
 
+    assert client.get(f"/challenge/{cid}").json()["status"] == "pending"
+    assert any(c["challenge_id"] == cid for c in client.get("/challenges?status=pending").json())
+
     r = client.post(f"/challenge/{cid}/resolve", json={"approved": approved})
     assert r.json()["decision"] == final
     assert r.json()["challenge_id"] == cid
-    assert client.post(f"/challenge/{cid}/resolve", json={"approved": approved}).status_code == 404
+    assert client.get(f"/challenge/{cid}").json()["status"] == final
+    assert client.post(f"/challenge/{cid}/resolve", json={"approved": approved}).status_code == 409
+    assert client.post("/challenge/nope/resolve", json={"approved": True}).status_code == 404
+
+
+def test_unanswered_challenge_times_out(client, agent, monkeypatch):
+    monkeypatch.setattr(gw, "decide", lambda identity, score, reasons: "challenge")
+    monkeypatch.setattr(gw, "_fire_webhook", lambda event: _noop())
+    cid = signed_checkout(client, agent).json()["challenge_id"]
+    monkeypatch.setattr(gw, "CHALLENGE_TTL_S", -1)
+    status = client.get(f"/challenge/{cid}").json()
+    assert status["status"] == "block" and status["reasons"][0] == "guardian_timeout"
+
+
+async def _noop():
+    pass
+
+
+def test_webhook_retries_then_delivers(monkeypatch):
+    calls = []
+
+    class FlakyClient:
+        def __init__(self, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): pass
+        async def post(self, url, json):
+            calls.append(url)
+            status = 500 if len(calls) < 2 else 200
+            return httpx.Response(status, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(gw, "CHALLENGE_WEBHOOK_URL", "http://guardian.test/challenge")
+    monkeypatch.setattr(gw.httpx, "AsyncClient", FlakyClient)
+    monkeypatch.setattr(gw.asyncio, "sleep", lambda s: _noop())
+    gw.challenges["cid-1"] = {"event": {}, "status": "pending", "created": 0, "webhook": "pending", "final": None}
+    asyncio.run(gw._fire_webhook({"challenge_id": "cid-1"}))
+    assert len(calls) == 2 and gw.challenges["cid-1"]["webhook"] == "delivered"
+
+
+def test_stats_excludes_resolutions():
+    events = [{"decision": "allow", "latency_ms": float(i), "reasons": ["base"]} for i in range(1, 101)]
+    events.append({"decision": "block", "latency_ms": 9999.0, "reasons": ["human_denied"]})
+    s = latency.summary(events)
+    assert s["latency_ms"]["p95"] == 95.0 and s["latency_ms"]["max"] == 100.0
+    assert s["decisions"] == {"allow": 100, "block": 1}
 
 
 def test_security_tests_endpoint(client):
