@@ -49,7 +49,7 @@ Wherever the plan says "A", "B", "C" or "D", read the name from this table.
 4. **Merge small and often.** Open a PR into `main` as soon as something works, and always before each gate. Don't hold a big branch until the evening.
 5. **Rebase on main before opening a PR:** `git fetch && git rebase origin/main`.
 6. **Shared files:** dependencies go in one root `requirements.txt` with exact versions, one per line, append only. On a merge conflict, keep both sides. Put env vars in `.env.example`; real secrets go in `.env` and are never committed.
-7. **Don't push to `main` directly** except for this file and `AGENTGATE_PLAN.md`.
+7. **Shared base goes straight to `main`** (Dipin is pushing the gateway foundation there in small commits). Everything else: PR from your branch.
 
 ## Stubs so nobody blocks on anyone
 
