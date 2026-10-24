@@ -30,6 +30,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(gw.verifier, "directory", fresh)
     monkeypatch.setattr(gw, "GUARDIAN_TOKEN", "guardian-secret")
     monkeypatch.setattr(gw, "challenges", {})
+    monkeypatch.setattr(db, "_last_browse", {})  # browse times otherwise leak across tests (too_fast rule)
+    if gw._policy:
+        monkeypatch.setattr(gw._policy, "thresholds", {"challenge_at": 30, "block_at": 70})
     with TestClient(gw.app) as c:
         assert (tmp_path / "events.db").exists()  # tests must not write to the real event log
         yield c
