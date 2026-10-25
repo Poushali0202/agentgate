@@ -5,14 +5,23 @@ the human in ASI:One with the item, amount and risk reasons, and the human repli
 resolves the challenge with the shared GUARDIAN_TOKEN the Shopper never has. A hijacked Shopper can't approve itself.
 """
 
+import json
 import re
+from uuid import uuid4
 
 import httpx
 from uagents import Agent, Context, Protocol
-from uagents_core.contrib.protocols.chat import ChatAcknowledgement, ChatMessage, StartSessionContent, chat_protocol_spec
+from uagents_core.contrib.protocols.chat import (
+    ChatAcknowledgement,
+    ChatMessage,
+    MetadataContent,
+    StartSessionContent,
+    TextContent,
+    chat_protocol_spec,
+)
 
 from agents import common
-from agents.common import ack_for, consumer_id_for, env, message_text, reasons_text, text_message
+from agents.common import ack_for, consumer_id_for, env, message_text, reasons_text, text_message, utcnow
 from agents.guardian import webhook
 
 common.load_env()
@@ -82,6 +91,68 @@ def card_text(event: dict) -> str:
         f"• Risk {event.get('risk_score', '?')}/100 — flagged: {reasons_text(event.get('reasons'))}\n"
         f"Reply \"approve\" or \"deny\".  (request {cid[:8]})"
     )
+
+
+def card_message(event: dict) -> ChatMessage:
+    """The challenge as an ASI:One Interactive Card (detail kind, Approve / Deny buttons) over the text version.
+
+    The text bubble is the narration above the card and is also the fallback: if ASI:One rejects the payload it
+    shows the text alone, and "approve" / "deny" replies keep working.
+    """
+    cid = str(event.get("challenge_id", ""))
+    payload = {
+        "title": "Guardian check — approve this purchase?",
+        "summary_rows": [
+            {"label": "Item", "value": _item_line(event)},
+            {"label": "Ship to", "value": _ship_line(event)},
+            {"label": "Risk", "value": f"{event.get('risk_score', '?')}/100"},
+            {"label": "Flagged", "value": reasons_text(event.get("reasons"))},
+            {"label": "Request", "value": cid[:8]},
+        ],
+        "ctas": [
+            {"label": "Deny — I didn't ask for this", "selection": {"action": "deny", "challenge_id": cid}, "primary": True},
+            {"label": "Approve", "selection": {"action": "approve", "challenge_id": cid}},
+        ],
+    }
+    return ChatMessage(
+        timestamp=utcnow(),
+        msg_id=uuid4(),
+        content=[
+            TextContent(type="text", text=card_text(event)),
+            MetadataContent(
+                type="metadata",
+                metadata={
+                    "card_protocol_version": "1",
+                    "requires_card_interaction": "true",
+                    "card_kind": "detail",
+                    "card_payload": json.dumps(payload),
+                    "preferred_drawer_width_px": "520",
+                },
+            ),
+        ],
+    )
+
+
+_PROSE_ACTION = re.compile(r"\b(approve|deny|denied|approved|reject)\b", re.I)
+_CID = re.compile(r"\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{8})\b", re.I)
+
+
+def _card_selection(text: str) -> tuple[str, str | None] | None:
+    """A button tap comes back as JSON (direct @mention) or as prose (planner-routed). Returns (action, cid) or None."""
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        data = None
+    if isinstance(data, dict) and data.get("action") in {"approve", "deny"}:
+        return data["action"], str(data.get("challenge_id") or "") or None
+    if text.lstrip().startswith("{"):
+        return None
+    m = _PROSE_ACTION.search(text)
+    if m and ("challenge" in text.lower() or "request" in text.lower() or _CID.search(text)):
+        action = "approve" if m.group(1).lower().startswith("approv") else "deny"
+        c = _CID.search(text)
+        return action, (c.group(1) if c else None)
+    return None
 
 
 async def load_names():
@@ -164,6 +235,13 @@ async def on_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
 
 
 async def handle(ctx: Context, text: str) -> str:
+    # A tap on the interactive card arrives here as JSON ({"action": "deny", "challenge_id": ...}) when the person
+    # talks to the Guardian directly, or as prose when ASI:One's planner routed them. Check that first.
+    selection = _card_selection(text)
+    if selection:
+        action, cid = selection
+        return await _answer(ctx, cid, approved=(action == "approve"))
+
     words = text.lower().strip(" !.?").split()
     verb = words[0] if words else ""
     prefix = words[1] if len(words) > 1 and len(words[1]) >= 4 else None
@@ -207,8 +285,8 @@ async def deliver(ctx: Context):
             ctx.logger.info(f"challenge {event.get('challenge_id')} is for consumer {event.get('consumer_id')}, not this Guardian's human; ignored")
             continue
         if owner:
-            await ctx.send(owner, text_message(card_text(event)))
-            ctx.logger.info(f"challenge {event.get('challenge_id')} shown to {owner}")
+            await ctx.send(owner, card_message(event))
+            ctx.logger.info(f"challenge {event.get('challenge_id')} shown to {owner} (interactive card + text)")
         else:
             ctx.logger.warning(f"challenge {event.get('challenge_id')} waiting: nobody has talked to the Guardian yet, so I don't know who to ask")
 
