@@ -210,3 +210,15 @@ def test_broken_teammate_module_fails_loudly(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(tmp_path))
     with pytest.raises(ModuleNotFoundError):
         gw._optional_module("broken_scoring")
+
+
+def test_key_age_survives_restart(tmp_path):
+    path = str(tmp_path / "directory.json")
+    key = Ed25519PrivateKey.generate()
+    d1 = Directory(path)
+    d1.register_jwk(public_jwk(key.public_key(), "old-agent"))
+    d1._first_seen["old-agent"] -= 3600  # registered an hour ago
+    d1.register_jwk(public_jwk(key.public_key(), "old-agent"))  # idempotent re-register persists the age
+    d2 = Directory(path)
+    assert d2.first_seen("old-agent") == d1.first_seen("old-agent")
+    assert "registered_at" not in d2.jwks()["keys"][0]

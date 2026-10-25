@@ -32,6 +32,8 @@ class Directory:
             with open(path) as f:
                 for jwk in json.load(f).get("keys", []):
                     self.register_jwk(jwk, persist=False)
+                    # Keep the original registration time, so a restart doesn't make every key "young" again.
+                    self._first_seen[jwk["kid"]] = jwk.get("registered_at", self._first_seen[jwk["kid"]])
                     self._persisted[jwk["kid"]] = jwk
 
     def register(self, keyid: str, public_key: Ed25519PublicKey) -> None:
@@ -53,7 +55,8 @@ class Directory:
         self.register(jwk["kid"], new_key)
         if persist and self.path:
             with self._lock:
-                self._persisted[jwk["kid"]] = public_jwk(self._keys[jwk["kid"]], jwk["kid"])
+                self._persisted[jwk["kid"]] = {**public_jwk(self._keys[jwk["kid"]], jwk["kid"]),
+                                               "registered_at": self._first_seen[jwk["kid"]]}
                 os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
                 with open(self.path, "w") as f:
                     json.dump({"keys": list(self._persisted.values())}, f, indent=2)
