@@ -9,7 +9,7 @@ import asyncio
 
 import httpx
 from uagents import Agent, Context, Protocol
-from uagents_core.contrib.protocols.chat import ChatAcknowledgement, ChatMessage, StartSessionContent, TextContent, chat_protocol_spec
+from uagents_core.contrib.protocols.chat import ChatAcknowledgement, ChatMessage, StartSessionContent, chat_protocol_spec
 
 from agents import common
 from agents.common import ack_for, card_fp_for, consumer_id_for, env, message_text, reasons_text, text_message
