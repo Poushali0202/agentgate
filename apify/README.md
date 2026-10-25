@@ -27,7 +27,12 @@ Without `--scanner`, the adapter runs Apify's e-commerce scraper and its own phr
 
 - **Detects** hidden text (the `hidden` attribute, inline and stylesheet `display:none` / `visibility:hidden` / zero opacity or font size / off-screen / `clip` / 1-px boxes, `aria-hidden`), HTML comments, and injection phrasing: overriding the user's instructions, addressing AI agents, concealing from the user, redirected shipping, quantity and payment overrides, gift cards.
 - **Outputs** one dataset item per page: `risk` (high / medium / low / error), `findings` (where, how it was hidden, the text, matched patterns) and `product` (`sku`, name, price, currency, category from JSON-LD).
+- **Crawls** with Crawlee (`crawl: true`, the default). Give it one storefront URL and it follows same-host links up to `maxPages`, scanning every page it finds.
 - **Develop:** `cd actor && apify run`, or run `pytest apify/actor/tests` from the repo root. **Deploy:** `cd actor && apify push`.
+
+## Storefront guard (in the gateway)
+
+The merchant's own pages get scanned too: a hacked review widget or a malicious marketplace listing can poison them. An hourly Apify Schedule runs the scanner over `STOREFRONT_URLS`. The gateway's `GET /storefront-scan` pulls the latest successful run (pull, because a laptop gateway isn't reachable from Apify). The dashboard's **Storefront scan** panel shows any page hiding instructions for AI agents, with the hidden text and how it was hidden. **Scan now** calls `POST /storefront-scan/run`.
 
 ## Output contract (what the shopper agent reads)
 

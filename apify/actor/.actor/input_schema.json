@@ -6,12 +6,25 @@
         "startUrls": {
             "title": "Pages to scan",
             "type": "array",
-            "description": "Product or content pages an AI agent is about to read.",
+            "description": "Product or content pages an AI agent is about to read. With crawling on, the storefront URL(s) to start from.",
             "editor": "requestListSources",
             "prefill": [
-                { "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/main/trap-page/malicious-product.html" },
-                { "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/main/trap-page/safe-product.html" }
+                { "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/main/trap-page/index.html" }
             ]
+        },
+        "crawl": {
+            "title": "Crawl the site",
+            "type": "boolean",
+            "description": "Follow links on the same host from each start URL and scan every page found.",
+            "default": true
+        },
+        "maxPages": {
+            "title": "Max pages",
+            "type": "integer",
+            "description": "Upper limit on pages scanned per run when crawling.",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 1000
         }
     },
     "required": ["startUrls"]

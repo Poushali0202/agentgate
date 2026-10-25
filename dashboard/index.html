@@ -53,6 +53,11 @@ pre{white-space:pre-wrap;margin:0;font:12.5px/1.5 ui-monospace,Menlo,monospace;c
 </div>
 
 <section>
+  <div class="bar" style="justify-content:space-between"><h2 style="margin:0">Storefront scan <span class="muted small">(our Apify Actor crawls your product pages for instructions hidden for AI agents)</span></h2><button id="scanBtn" class="ghost">Scan now</button></div>
+  <div id="storefront" class="muted" style="margin-top:10px">Loading…</div>
+</section>
+
+<section>
   <h2>Ask the investigator</h2>
   <form id="ask" class="bar"><input id="question" type="text" value="Why was the last block flagged?"><button id="askBtn">Ask Claude</button></form>
   <div id="answer" class="answer muted">Claude reads this decision log through one read-only tool and explains decisions with rule IDs.</div>
@@ -117,6 +122,26 @@ async function refresh(){
   catch(e){$('status').textContent=`Disconnected · ${e.message}. Retrying…`;$('status').setAttribute('role','alert')}
   finally{setTimeout(refresh,1000)}
 }
+async function refreshStorefront(){
+  const box=$('storefront');
+  try{const s=await request('/storefront-scan');
+    if(!s.configured){box.textContent='Not connected: set APIFY_API_TOKEN in .env to show the Apify storefront scan.';$('scanBtn').disabled=true;return}
+    if(!s.run){box.textContent='No scan yet. Press "Scan now".';return}
+    box.replaceChildren();box.className='';
+    const head=el('div','','verdict');
+    head.append(el('span',s.counts.high?`${s.counts.high} of ${s.pages} pages hide instructions for AI agents`:`All ${s.pages} pages clean`,s.counts.high?'block':'allow'));
+    box.append(head,el('div',`Last Apify run ${new Date(s.run.finished_at).toLocaleString()} · ${s.counts.low||0} clean · ${s.counts.medium||0} suspicious${s.errors?` · ${s.errors} unreachable`:''}`,'muted small'));
+    for(const f of s.flagged){const d=el('div','');d.style.marginTop='10px';
+      d.append(el('span',f.risk,`pill ${f.risk==='high'?'block':'challenge'}`),document.createTextNode(` ${f.url.split('/').pop()}${f.sku?' ('+f.sku+')':''} `));
+      for(const p of f.patterns)d.append(el('span',p,'chip'));
+      if(f.hidden_text){const q=el('div',`“${f.hidden_text}”`,'muted small');q.style.marginTop='4px';d.append(q,el('div',`hidden via ${f.technique}`,'muted small'))}
+      box.append(d)}
+  }catch(e){box.className='muted';box.textContent=`Storefront scan unavailable: ${e.message}`}
+}
+$('scanBtn').addEventListener('click',async()=>{$('scanBtn').disabled=true;
+  try{const r=await request('/storefront-scan/run',{method:'POST'});$('storefront').textContent=`Apify run ${r.run_id} started; results appear here in about a minute.`;setTimeout(refreshStorefront,45000)}
+  catch(e){$('storefront').textContent=e.message}finally{setTimeout(()=>{$('scanBtn').disabled=false},60000)}});
+refreshStorefront();setInterval(refreshStorefront,30000);
 $('scenarios').addEventListener('click',async e=>{const s=e.target.dataset.s;if(!s)return;
   try{await request(`/sim/run/${s}`,{method:'POST'});refreshRuns()}catch(err){$('runlog').textContent=err.message}});
 $('ask').addEventListener('submit',async e=>{e.preventDefault();$('askBtn').disabled=true;$('answer').className='answer muted';$('answer').textContent='Claude is reading the decision log…';
