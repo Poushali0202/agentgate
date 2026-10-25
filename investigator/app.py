@@ -1,42 +1,29 @@
-from pathlib import Path
+"""HTTP front for the investigator.
 
-from fastapi import FastAPI, HTTPException
+    cd investigator && uvicorn app:app --port 8020
+    curl -X POST localhost:8020/investigate -H 'Content-Type: application/json' \
+         -d '{"question": "why was the last block flagged?"}'
+"""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from investigator import DecisionLog
-from claude_client import investigate_event
-
-
-BASE_DIR = Path(__file__).parent
-LOG = DecisionLog(str(BASE_DIR / "events.json"))
+from claude_client import GATEWAY_URL, MODEL, investigate
 
 app = FastAPI(title="AgentGate Investigator")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 class InvestigationRequest(BaseModel):
-    event_id: str
+    question: str = "Why was the last block flagged?"
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "gateway": GATEWAY_URL, "model": MODEL}
 
 
 @app.post("/investigate")
-def investigate(request: InvestigationRequest):
-    event = LOG.get_event(request.event_id)
-
-    if not event:
-        raise HTTPException(
-            status_code=404,
-            detail="Event not found",
-        )
-
-    explanation = investigate_event(event)
-
-    return {
-        "event_id": request.event_id,
-        "decision": event.get("decision"),
-        "explanation": explanation,
-        "read_only": True,
-    }
+def investigate_endpoint(request: InvestigationRequest):
+    return {"question": request.question, "answer": investigate(request.question), "read_only": True}
