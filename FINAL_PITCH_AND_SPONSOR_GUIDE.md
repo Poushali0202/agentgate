@@ -16,7 +16,7 @@ Use the checked items as evidence; unchecked items still need a person to comple
 | Resource | Link |
 |---|---|
 | Public repository | https://github.com/Poushali0202/agentgate |
-| Merchant dashboard, login required | https://agentgate.149-28-196-135.sslip.io/ |
+| Public merchant judging demo | https://agentgate.149-28-196-135.sslip.io/ |
 | Editable Figma design | https://www.figma.com/design/Ouys91iuPBUqW5Jvu56Ie7 |
 | Public Apify Actor | https://apify.com/tangy_taste_poy/agent-prompt-injection-scanner |
 | Agent setup and commands | [agents/README.md](agents/README.md) |
@@ -46,7 +46,7 @@ The agent README still has address placeholders and an older statement that card
 
 ### Replacement URL handoff
 
-Use **https://agentgate.149-28-196-135.sslip.io/** for the merchant site and the public gateway. The old deployment URL is retired from active documentation and local deployment settings. Existing merchant credentials are preserved. Vultr login is not required to keep the site running; systemd supervises the gateway, investigator, and Caddy.
+Use **https://agentgate.149-28-196-135.sslip.io/** for the merchant site and the public gateway. The old deployment URL is retired from active documentation and local deployment settings. At the user's request, the judging website password has been removed: the dashboard, merchant demo controls, and investigator are public. Guardian endpoints still enforce their separate bearer token. Vultr login is not required to keep the site running; systemd supervises the gateway, investigator, and Caddy.
 
 A real reboot was tested: the boot ID changed, all three services returned active and enabled, HTTPS loaded the matching dashboard, and saved events remained available.
 
@@ -59,9 +59,9 @@ Fill these with the actual running agents; never derive an address from a develo
 | Field | Value to add |
 |---|---|
 | Shopper name | `agentgate-shopper` |
-| Shopper Agentverse address and public profile | **Poushali to supply** |
+| Shopper Agentverse address and public profile | `agent1qgllwhxush0wyfdfa45pklq2pjax7rqjsqexa8j0ynmp7yzmcseu59qdp69` — recorded in the team README; live discoverability still needs verification |
 | Guardian name | `agentgate-guardian` |
-| Guardian Agentverse address and public profile | **Poushali to supply** |
+| Guardian Agentverse address and public profile | `agent1qf46y538dkcd4edmwh4cc2kzf3x8xgay669dzj77ym2a9zqv8dcm6s3xzqv` — recorded in the team README; live discoverability still needs verification |
 | Running process owner / machine | **Poushali to confirm** |
 | Gateway URL used by both agents | **Confirm actual value** |
 | Successful live demo recording / timestamp | **Add after verification** |
@@ -86,7 +86,7 @@ If ASI:One is not verified in time, use the gateway simulator for the core demon
 ### Exact ASI:One rehearsal
 
 1. Confirm Poushali's actual agent addresses, mailbox connections, running processes, and shared gateway URL.
-2. Check the public store endpoint and agent key registration; confirm the merchant dashboard loads with login.
+2. Check the public store endpoint and agent key registration; confirm the public merchant dashboard loads without a password.
 3. Speak to Guardian first: `hi`. Use the intended human's conversation.
 4. Tell Shopper `hijack off`, then `buy me wireless headphones under $200`.
 5. Find the resulting allowed event in the merchant log. A completed normal purchase establishes the drift baseline.
@@ -222,7 +222,7 @@ Review the current [Figma challenge instructions](https://docs.google.com/docume
 
 ### MLH — Best Use of Vultr
 
-**Description:** AgentGate's gateway and investigator run on a Vultr Ubuntu VM behind Caddy HTTPS. The deployment separates public agent endpoints from authenticated merchant tools, supervises processes with systemd, and persists the event log outside the release checkout. It provides a real hosted integration target for shopping agents.
+**Description:** AgentGate's gateway and investigator run on a Vultr Ubuntu VM behind Caddy HTTPS. The deployment supervises processes with systemd and persists the event log outside the release checkout. The judging demo is public, while Guardian approvals retain bearer-token protection. It provides a real hosted integration target for shopping agents.
 
 **Demo:** show the live HTTPS dashboard, a signed checkout appearing there, and the Vultr instance overview without credentials. Gateway, investigator, and Caddy were verified active and enabled at boot on the replacement server. The original server became unreachable; the replacement starts a fresh event log and was tested with clearly synthetic traffic.
 

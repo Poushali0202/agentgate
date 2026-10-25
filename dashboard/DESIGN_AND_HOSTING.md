@@ -34,8 +34,11 @@ Rebuilt October 25, 2026 after the original server became unreachable. The
 gateway, investigator, and Caddy are enabled at boot and run independently of
 any Vultr browser login. Running Shopper and Guardian processes must use this
 new origin as `GATEWAY_URL`; repository changes do not update external processes.
-Merchant routes require authentication. Credentials and deployment keys stay
-outside this repository.
+The judging deployment is now public at the user's request: the dashboard,
+merchant demo controls, and investigator do not require a website password.
+Guardian challenge access and resolution still require the separate bearer
+token. API keys and deployment keys stay outside this repository. Restore
+merchant authentication before using real customer data or production policy.
 
 ## Figma design brief
 
