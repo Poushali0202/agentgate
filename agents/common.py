@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import re
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -47,13 +48,20 @@ def ack_for(msg: ChatMessage) -> ChatAcknowledgement:
     return ChatAcknowledgement(timestamp=utcnow(), acknowledged_msg_id=msg.msg_id)
 
 
+_MENTION = re.compile(r"@?agent1q[0-9a-z]{20,}")
+
+
 def message_text(msg: ChatMessage) -> str:
-    """Concatenate the text parts of an incoming chat message."""
+    """Concatenate the text parts of an incoming chat message.
+
+    ASI:One keeps the @agent1q... mention inside the text it delivers, so strip agent addresses out: otherwise the
+    Shopper searches the store for an address and the Guardian reads one as the approve/deny verb.
+    """
     parts = []
     for item in msg.content:
         if isinstance(item, TextContent):
-            parts.append(item.text)
-    return " ".join(parts).strip()
+            parts.append(_MENTION.sub(" ", item.text))
+    return re.sub(r"\s+", " ", " ".join(parts)).strip()
 
 
 def consumer_id_for(sender: str) -> str:

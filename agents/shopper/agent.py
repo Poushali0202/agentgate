@@ -118,22 +118,22 @@ async def shop(ctx: Context, sender: str, text: str) -> str:
     head = "\n".join(notes + [""]) if notes else ""
 
     await gateway.browse(http, consumer_id, q=intent.item)
-    # Show the shopper what was found, then place the order. The pause is how a careful agent behaves; it also
-    # keeps an honest purchase clear of the gateway's `too_fast` rule (browse -> checkout under 3 s).
-    await ctx.send(sender, text_message(head + f"Found {line}. Placing the order…"))
+    # Browse, pause, then checkout. The pause is how a careful agent behaves; it also keeps an honest purchase clear
+    # of the gateway's `too_fast` rule (browse -> checkout under 3 s). ASI:One merges every message an agent sends
+    # in one turn into a single bubble, newest first, so send one message per turn where possible.
     await asyncio.sleep(BROWSE_PAUSE_S)
     order = {"consumer_id": consumer_id, "card_fp": card_fp, "ship_to": ship_to, "cart": [{"sku": product["sku"], "qty": qty}]}
     d = await gateway.checkout(http, order, scenario=scenario)
-    head = ""
+    found = f"Found {line}."
 
     if d.decision == "allow":
-        return head + f"✅ Ordered: {line}.\nGateway decision: allow (risk {d.risk_score}, {d.latency_ms:.1f} ms)."
+        return head + f"{found}\n✅ Ordered. Gateway decision: allow (risk {d.risk_score}, {d.latency_ms:.1f} ms)."
     if d.decision == "block":
-        return head + f"⛔ The store blocked this order: {line}.\nReason: {reasons_text(d.reasons)} (risk {d.risk_score})."
+        return head + f"{found}\n⛔ The store blocked this order.\nReason: {reasons_text(d.reasons)} (risk {d.risk_score})."
     if d.decision == "challenge" and d.challenge_id:
         ctx.logger.info(f"challenge {d.challenge_id} for {consumer_id}; waiting for the Guardian")
         await ctx.send(sender, text_message(
-            head + f"⏸ The store flagged this order: {line}.\nIt's with your Guardian now — approve or deny it there. "
+            head + f"{found}\n⏸ The store flagged this order. It's with your Guardian now — approve or deny it there. "
                    f"I'll wait up to {int(CHALLENGE_WAIT_S)} s."))
         result = await gateway.wait_for_challenge(http, d.challenge_id, CHALLENGE_WAIT_S)
         status, outcome = result.get("status"), result.get("outcome")
