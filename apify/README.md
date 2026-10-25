@@ -32,7 +32,7 @@ Without `--scanner`, the adapter runs Apify's e-commerce scraper and its own phr
 
 ## Storefront guard (in the gateway)
 
-The merchant's own pages get scanned too: a hacked review widget or a malicious marketplace listing can poison them. An hourly Apify Schedule runs the scanner over `STOREFRONT_URLS`. The gateway's `GET /storefront-scan` pulls the latest successful run (pull, because a laptop gateway isn't reachable from Apify). The dashboard's **Storefront scan** panel shows any page hiding instructions for AI agents, with the hidden text and how it was hidden. **Scan now** calls `POST /storefront-scan/run`.
+The merchant's own pages get scanned too: a hacked review widget or a malicious marketplace listing can poison them. An hourly Apify Schedule (`agentgate-storefront-scan`, cron `0 * * * *`) crawls the storefront with the scanner. The gateway can also start a crawl of `STOREFRONT_URLS` on demand. The gateway's `GET /storefront-scan` pulls the latest successful run (pull, because a laptop gateway isn't reachable from Apify). The dashboard's **Storefront scan** panel shows any page hiding instructions for AI agents, with the hidden text and how it was hidden. **Scan now** calls `POST /storefront-scan/run`.
 
 ## Output contract (what the shopper agent reads)
 
