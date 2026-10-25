@@ -16,7 +16,7 @@ Use the checked items as evidence; unchecked items still need a person to comple
 | Resource | Link |
 |---|---|
 | Public repository | https://github.com/Poushali0202/agentgate |
-| Merchant dashboard, login required | https://agentgate.149-28-201-108.sslip.io/ |
+| Merchant dashboard, login required | https://agentgate.149-28-196-135.sslip.io/ |
 | Editable Figma design | https://www.figma.com/design/Ouys91iuPBUqW5Jvu56Ie7 |
 | Public Apify Actor | https://apify.com/tangy_taste_poy/agent-prompt-injection-scanner |
 | Agent setup and commands | [agents/README.md](agents/README.md) |
@@ -36,13 +36,21 @@ The latest reviewed team main is `f5da37b`, including Poushali's ASI:One work th
 | ASI:One Interactive Card | Approve/Deny metadata payload and text fallback are implemented in Guardian; [PR #12](https://github.com/Poushali0202/agentgate/pull/12). |
 | ASI:One routing fixes | Latest-chat routing, stricter selection parsing, and reply handling are merged through [PR #14](https://github.com/Poushali0202/agentgate/pull/14). PR notes describe behavior observed in ASI:One. |
 | Complete live ASI:One demonstration | **Needs final independent verification:** stable addresses, discoverability, normal purchase, challenge, deliberate human answer, and matching gateway outcome. A code merge alone does not establish this. |
-| Latest Vultr deployment | Last successful verification was `07515d6`. A fresh SSH/HTTPS check during preparation of this guide timed out; current availability and deployment revision are unconfirmed. |
+| Replacement Vultr deployment | Application baseline `40e57ea` rebuilt on October 25 at the new URL. HTTPS, merchant/Guardian access controls, public key registration, five signature checks, investigator health, Apify results, and all five simulator scenarios passed. |
 
 The agent code is already integrated with the gateway API; no new checkout endpoint is needed. Poushali's running agents must target the deployed `GATEWAY_URL`, and Guardian must use the server's matching `GUARDIAN_TOKEN`. Public agent routes and Guardian authorization were verified in the earlier deployment. Guardian can poll pending challenges if a webhook cannot reach it.
 
 The agent README still has address placeholders and an older statement that cards are text only. For the implementation, refer to `agents/guardian/agent.py::card_message`; do not present that older README sentence as current evidence.
 
 **Important trust limit:** PR #14 narrows accepted reply formats after an ASI:One personal AI answered a challenge. Short replies and planner narration remain accepted. This is a prototype interaction filter, not cryptographic proof of a deliberate human click. Default Guardian routing also requires careful single-user demo setup; production needs authenticated owner binding and isolation.
+
+### Replacement URL handoff
+
+Use **https://agentgate.149-28-196-135.sslip.io/** for the merchant site and the public gateway. The old deployment URL is retired from active documentation and local deployment settings. Existing merchant credentials are preserved. Vultr login is not required to keep the site running; systemd supervises the gateway, investigator, and Caddy.
+
+A real reboot was tested: the boot ID changed, all three services returned active and enabled, HTTPS loaded the matching dashboard, and saved events remained available.
+
+Poushali must set `GATEWAY_URL=https://agentgate.149-28-196-135.sslip.io` for the running Shopper and Guardian processes and restart those processes to load it. Their seeds and Guardian token should remain the existing values. Register the Shopper key against this new gateway before judging. External agent process settings and submission links cannot be changed merely by merging this repository. Update Devpost/video captions or shared links if the old URL was already copied there.
 
 ### ASI:One handoff fields
 
@@ -137,7 +145,7 @@ These are fit assessments, not guarantees of eligibility or prizes. Final track 
 | Most Creative Hack | Strong authentication/behavior distinction | Center the challenge design and slow-and-low example. |
 | Apify — Best Use / Best Actor | Real Actor and dashboard integration verified previously | Public Actor link, dataset evidence, relevant scan finding. |
 | Figma — Best Figma Workflow Hack | Editable workflow artifact exists | Walk through reasoning, components, and implemented result. |
-| MLH — Best Use of Vultr | Actual deployment verified previously | Restore/check current reachability and record deployment evidence. |
+| MLH — Best Use of Vultr | Actual deployment verified previously | Replacement HTTPS verified; record the new deployment URL. |
 | Anthropic — Claude for Public Benefit | Working Claude feature; public-benefit case conditional | Specific community, actual validation if available, demonstrated explanation. |
 | MLH — Commit Fellowship | Conditional on team intent | Opt in and complete the supplemental form. |
 | Hyphenate | Conditional finance/workflow fit | Confirm sponsor fit; show the failure-handling moment and real/simulated evidence. |
@@ -216,7 +224,7 @@ Review the current [Figma challenge instructions](https://docs.google.com/docume
 
 **Description:** AgentGate's gateway and investigator run on a Vultr Ubuntu VM behind Caddy HTTPS. The deployment separates public agent endpoints from authenticated merchant tools, supervises processes with systemd, and persists the event log outside the release checkout. It provides a real hosted integration target for shopping agents.
 
-**Demo:** show the live HTTPS dashboard, a signed checkout appearing there, and the Vultr instance overview without credentials. Confirm gateway, investigator, and Caddy health first. The current timeout must be resolved or reported honestly; an earlier successful deployment does not prove current availability.
+**Demo:** show the live HTTPS dashboard, a signed checkout appearing there, and the Vultr instance overview without credentials. Gateway, investigator, and Caddy were verified active and enabled at boot on the replacement server. The original server became unreachable; the replacement starts a fresh event log and was tested with clearly synthetic traffic.
 
 ### Anthropic — Claude for Public Benefit
 
@@ -261,7 +269,7 @@ Review the current [Figma challenge instructions](https://docs.google.com/docume
 | Separate Guardian approval credential | Prototype owner routing/reply parsing is not strong human authentication or audited multi-user isolation. |
 | AI investigator | Real Claude call verified; read-only tools, advisory explanation, possible factual/inference errors. |
 | Public Apify Actor and successful scan | Pattern detection; neither universal injection detection nor automatic prevention. |
-| Vultr-hosted prototype | Last successful deployment verified earlier; current reachability needs a fresh check. |
+| Vultr-hosted prototype | Replacement HTTPS deployment verified; its new event log contains labeled synthetic verification traffic, not recovered historical merchant data. |
 | Editable Figma workflow | Distinguish proposed designs, implemented interface, and actual recorded history. |
 
 Avoid “enterprise ready,” “KYC verified human,” “live Visa integration,” “two tickets per person,” “zero false positives,” “every malicious agent caught,” and “human approval cannot be spoofed.” Those claims are not supported.
@@ -302,7 +310,7 @@ Avoid “enterprise ready,” “KYC verified human,” “live Visa integration
 - [x] Editable Figma artifact and public Apify Actor exist.
 - [x] Real Claude investigator request verified earlier.
 - [x] Test the integrated `f5da37b` baseline: 68 gateway, simulator, and scanner tests passed.
-- [ ] Restore/verify current Vultr HTTPS and service health; record actual deployed revision.
+- [x] Rebuild on Vultr and verify HTTPS, service health, access controls, scanner results, and demo scenarios on application baseline `40e57ea`.
 - [ ] Poushali: provide stable agent addresses, running process details, and the full ASI:One capture.
 - [ ] Confirm no automatic approval/denial occurs before the human's deliberate answer.
 - [ ] Add video URL, project image, agent profiles, and Actor run/dataset links.
@@ -320,7 +328,7 @@ Avoid “enterprise ready,” “KYC verified human,” “live Visa integration
 |---|---|
 | Tested application baseline | `f5da37b`; pitch-pack addition is documentation only |
 | Test result / command | `68 passed` — `.venv/bin/python -m pytest gateway/tests simulator/tests apify/actor/tests -q` |
-| Actual deployed revision / health time | Add after fresh server check |
+| Replacement deployed application baseline | `40e57ea`; verified October 25, 2026; subsequent documentation-only release noted in Git history |
 | General demo video | Add URL |
 | Fetch workflow video | Add URL |
 | Project image | Add URL or repository path |
@@ -347,6 +355,6 @@ Next work in order: confirm the actual submission deadline → check hosted avai
 - Supplied **13.0 Hacker Guide.pdf**, sponsor descriptions and judging criteria. Its older Figma title is superseded by the live listing. Some sponsor details were incomplete.
 - Supplied **fetchai.pdf**, especially pages 4–6: mandatory ASI:One/Agentverse/ACP workflow, deliverables, registration, and bonus features.
 - Repository implementation, TEAM.md, and linked PRs: technical behavior and ownership.
-- Prior recorded deployment checks: hosted services, access controls, scanner run, Claude call, and UX verification. Fresh server checks timed out during this preparation; earlier evidence is labeled accordingly.
+- Deployment verification: the original server timed out; replacement application baseline `40e57ea` passed fresh HTTPS, access-control, signed-request, investigator-health, scanner, and simulator checks on October 25. The earlier real Claude request remains historical evidence; no fresh paid inference was needed for the rebuild.
 
 Track descriptions above are original drafts based on our implementation and the supplied guidance. They do not assert organizer approval. External submissions and messages require the team's actual submission action.

@@ -29,7 +29,11 @@ through the deployed proxy as well as a normal signed checkout.
 
 A Vultr server has been deployed in Silicon Valley: one vCPU, 2 GB RAM,
 55 GB SSD, Ubuntu 24.04 LTS, with automatic backups ($12/month total).
-Public HTTPS URL: https://agentgate.149-28-201-108.sslip.io/
+Public HTTPS URL: https://agentgate.149-28-196-135.sslip.io/
+Rebuilt October 25, 2026 after the original server became unreachable. The
+gateway, investigator, and Caddy are enabled at boot and run independently of
+any Vultr browser login. Running Shopper and Guardian processes must use this
+new origin as `GATEWAY_URL`; repository changes do not update external processes.
 Merchant routes require authentication. Credentials and deployment keys stay
 outside this repository.
 
@@ -57,7 +61,7 @@ states. On phones, allow the decision table to scroll without clipping controls.
 Implemented: live feed, event inspection, counters, policy controls, five
 scenario buttons, measured detection metrics, slow-low comparison, security
 checks, investigator integration and the Apify storefront scan panel.
-A real Guardian webhook and Anthropic credentials require configuration.
+Anthropic credentials are configured on the replacement server. Guardian can use its configured webhook or authenticated polling; verify the live agent flow separately.
 Apify has been configured on the deployed server and a scanner run returned results.
 The simulator and investigator provide explicitly labeled local fallbacks.
 Do not present simulated example values as measured live results.
