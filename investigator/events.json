@@ -1,0 +1,28 @@
+[
+  {
+    "event_id": "evt-001",
+    "scenario": "hijacked_agent",
+    "agent_id": "shopper-01",
+    "key_id": "key-shopper-01",
+    "merchant": "agentgate-demo-store",
+    "product_id": "headphones-001",
+    "requested_quantity": 20,
+    "original_quantity": 1,
+    "shipping_address": "unrecognized-address",
+    "signature_valid": true,
+    "nonce_reused": false,
+    "risk_score": 87,
+    "decision": "challenge",
+    "rule_ids": [
+      "quantity_spike",
+      "address_drift",
+      "prompt_injection_detected"
+    ],
+    "reasons": [
+      "Requested quantity differs from original user intent",
+      "Shipping address is not recognized",
+      "Product page contained instructions targeting AI agents"
+    ],
+    "timestamp": "2026-10-24T15:30:00Z"
+  }
+]

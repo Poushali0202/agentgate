@@ -1,0 +1,11 @@
+{
+  "detailsUrls": [
+    {
+      "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/sanjana/demo/trap-page/safe-product.html"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/sanjana/demo/trap-page/malicious-product.html"
+    }
+  ],
+  "scrapeMode": "AUTO"
+}
