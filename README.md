@@ -47,11 +47,22 @@ Python · FastAPI · `cryptography` (Ed25519) · Fetch.ai uAgents + Agentverse +
 
 MIT
 
+## Agents
+
+Both agents are on Agentverse, speak the Agent Chat Protocol and can be found in ASI:One. See [agents/README.md](agents/README.md) for how to run them.
+
+| Agent | Name | Address |
+|---|---|---|
+| Shopper | `agentgate-shopper` | `agent1qgllwhxush0wyfdfa45pklq2pjax7rqjsqexa8j0ynmp7yzmcseu59qdp69` |
+| Guardian | `agentgate-guardian` | `agent1qf46y538dkcd4edmwh4cc2kzf3x8xgay669dzj77ym2a9zqv8dcm6s3xzqv` |
+
+The shopper's whole workflow happens inside an ASI:One conversation. The merchant dashboard at the gateway is the store's ops console, not the shopper's UI.
+
 ## Running the gateway
 
 ```bash
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
-cp .env.example .env            # set CHALLENGE_WEBHOOK_URL to the Guardian's listener
+cp .env.example .env            # set GUARDIAN_TOKEN (same value as the Guardian); the gateway reads .env itself
 .venv/bin/uvicorn gateway.app:app --port 8000
 .venv/bin/python -m pytest -q gateway/tests
 ```

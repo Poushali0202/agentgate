@@ -1,6 +1,6 @@
 """AgentGate gateway: verify -> score -> decide on every agent checkout.
 
-Run:  uvicorn gateway.app:app --port 8000
+Run:  uvicorn gateway.app:app --port 8000      (reads .env from the working directory)
 """
 
 import asyncio
@@ -21,9 +21,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
-from gateway import db, latency, security_tests, store
-from gateway.directory import Directory
-from gateway.verify import Verifier
+from gateway import envfile
+
+envfile.load()  # before the imports below read their config from os.environ
+
+from gateway import db, latency, security_tests, store  # noqa: E402
+from gateway.directory import Directory  # noqa: E402
+from gateway.verify import Verifier  # noqa: E402
 
 log = logging.getLogger("agentgate")
 
