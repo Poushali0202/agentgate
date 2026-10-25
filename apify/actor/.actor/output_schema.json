@@ -1,0 +1,23 @@
+{
+    "actorOutputSchemaVersion": 1,
+    "title": "Agent Prompt-Injection Scanner output",
+    "properties": {
+        "overview": {
+            "type": "string",
+            "title": "Scan results",
+            "description": "One row per page: risk verdict, matched injection patterns and the declared product.",
+            "template": "{{links.apiDefaultDatasetUrl}}/items?view=overview"
+        },
+        "findings": {
+            "type": "string",
+            "title": "Findings",
+            "description": "The exact hidden or suspicious text found on each page, and how it was hidden.",
+            "template": "{{links.apiDefaultDatasetUrl}}/items?view=findings"
+        },
+        "all": {
+            "type": "string",
+            "title": "All fields (JSON)",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        }
+    }
+}
