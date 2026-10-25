@@ -57,13 +57,42 @@ states. On phones, allow the decision table to scroll without clipping controls.
 Implemented: live feed, event inspection, counters, policy controls, five
 scenario buttons, measured detection metrics, slow-low comparison, security
 checks, investigator integration and the Apify storefront scan panel.
-A real Guardian webhook and Anthropic/Apify credentials require configuration.
+A real Guardian webhook and Anthropic credentials require configuration.
+Apify has been configured on the deployed server and a scanner run returned results.
 The simulator and investigator provide explicitly labeled local fallbacks.
 Do not present simulated example values as measured live results.
 
 The implemented frontend is the reference for an editable Figma design.
-Figma connection and document creation remain pending; no Figma file has
-yet been created.
+An editable Figma file now exists at
+https://www.figma.com/design/Ouys91iuPBUqW5Jvu56Ie7 . It contains the problem
+sketch, desktop and mobile merchant dashboards, proposed visual Challenge Card,
+and design evolution. The card is a design proposal; the real Guardian flow
+must still be verified independently.
+
+## Millisecond correlation diagnostic
+
+`simulator/correlation.py` analyzes stored gateway event timestamps. The
+dashboard displays its results from the additive `timing_correlation` field in
+`GET /sim/metrics`. A match requires at least three distinct verified agent keys
+sharing a nonempty card fingerprint or shipping address within an inclusive
+100 ms sliding window. Duplicate request IDs and human resolution records are
+excluded. Each matched request is counted once across both types of link;
+evidence windows can overlap. This is historical analysis, not a live alert.
+
+These are gateway observation timestamps, not synchronized client send times.
+Shared identifiers are client-supplied demo values. Timing alone does not prove
+malice, and the diagnostic does not change scores or checkout decisions. No
+event fields, scoring rule IDs, endpoint paths, or scenario names were changed.
+
+## Visa demo boundary
+
+The demo uses real Ed25519 cryptography for TAP-shaped HTTP signatures and a
+mock public-key directory. This is not Visa onboarding, Visa-issued consumer
+identity, payment tokenization, KYC, or a live payment authorization. Present it
+as a simulated integration boundary built around the public TAP concepts.
+Synthetic consumer IDs and card fingerprints must not be described as verified
+people or Visa payment credentials. Full consumer/payment-container integration
+would require additional validation and the relevant provider access.
 
 ## Verification before handoff
 

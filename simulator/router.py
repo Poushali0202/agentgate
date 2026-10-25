@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from gateway import db
 from gateway.latency import is_resolution
+from simulator.correlation import correlate
 from simulator.scenarios import SCENARIOS, Run
 
 router = APIRouter()
@@ -82,6 +83,7 @@ def metrics(events: list[dict]) -> dict:
         "precision": round(tp / (tp + fp), 3) if tp + fp else None,
         "recall": round(tp / (tp + fn), 3) if tp + fn else None,
         "false_alarm_rate": round(fp / (fp + tn), 3) if fp + tn else None,
+        "timing_correlation": correlate(events),
         "slow_low": {
             "n": len(slow),
             "velocity_fired": sum(1 for e in slow if VELOCITY_RULES.intersection(e["reasons"])),
