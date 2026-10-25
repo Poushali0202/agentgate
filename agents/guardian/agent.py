@@ -150,7 +150,9 @@ def _card_selection(text: str) -> tuple[str, str | None] | None:
     # Prose (planner-routed tap). Be strict: it must be short, name a request id, and must not be the card's own
     # wording echoed back ("Reply approve or deny… (request …)"), which would make the Guardian answer itself.
     lowered = text.lower()
-    if len(text) > 240 or "guardian check" in lowered or 'reply "approve"' in lowered or "reply approve" in lowered:
+    # A planner narration is one short sentence ("The user picked deny for request 85716d48."). The person's
+    # personal AI writes paragraphs that also start with "Deny 85716d48 …", so length is the discriminator.
+    if len(text) > 90 or "guardian check" in lowered or 'reply "approve"' in lowered or "reply approve" in lowered:
         return None
     m = _PROSE_ACTION.search(text)
     c = _CID.search(text)
@@ -250,8 +252,12 @@ async def handle(ctx: Context, text: str) -> str:
         return await _answer(ctx, cid, approved=(action == "approve"))
 
     words = text.lower().strip(" !.?").split()
+    # A typed command is one to three words ("deny", "approve 3f9a"). Anything longer is conversation, most likely
+    # the person's ASI:One personal AI talking to us, and must never resolve a challenge.
+    if len(words) > 3:
+        return HELP
     verb = words[0] if words else ""
-    prefix = words[1] if len(words) > 1 and len(words[1]) >= 4 else None
+    prefix = words[1].strip(".,;:—-") if len(words) > 1 and len(words[1].strip(".,;:—-")) >= 4 else None
 
     if verb in {"approve", "yes", "ok", "allow", "confirm", "y"}:
         return await _answer(ctx, prefix, approved=True)
@@ -270,6 +276,7 @@ async def _answer(ctx: Context, prefix: str | None, approved: bool) -> str:
     if event is None:
         return "There's nothing waiting for your answer right now." if not prefix else f"I don't have a request starting with {prefix}."
     cid = event["challenge_id"]
+    ctx.logger.info(f"resolving {cid[:8]} as {'APPROVE' if approved else 'DENY'} (matched {prefix or 'latest pending'})")
     outcome = await resolve(cid, approved)
     if outcome != "ok":
         return f"I couldn't send your answer: {outcome}."
