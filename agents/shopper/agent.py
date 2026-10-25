@@ -6,6 +6,7 @@ On a challenge it waits for the Guardian; it is never told why it was challenged
 """
 
 import asyncio
+import os
 
 import httpx
 from uagents import Agent, Context, Protocol
@@ -18,6 +19,9 @@ from agents.shopper.gateway import Gateway
 from agents.shopper.intent import extract
 
 common.load_env()
+# The Shopper must never hold the Guardian's token: that's what stops a hijacked Shopper approving its own purchase.
+# Both agents may share one .env, so drop it from this process.
+_DROPPED_GUARDIAN_TOKEN = os.environ.pop("GUARDIAN_TOKEN", None) is not None
 
 GATEWAY_URL = env("GATEWAY_URL", "http://localhost:8000")
 KEYID = env("SHOPPER_KEYID", "agentgate-shopper")
@@ -46,6 +50,8 @@ HELP = (
 async def startup(ctx: Context):
     ctx.logger.info(f"Shopper address: {agent.address}")
     ctx.logger.info(f"Gateway: {GATEWAY_URL}  keyid: {KEYID}  hijack mode: {'ON' if hijack.enabled() else 'off'}")
+    if _DROPPED_GUARDIAN_TOKEN:
+        ctx.logger.info("GUARDIAN_TOKEN was in the environment; dropped it. The Shopper can't approve challenges.")
     try:
         ctx.logger.info(f"Key directory: {await gateway.register(http)}")
     except httpx.HTTPError as e:

@@ -5,12 +5,14 @@ the human in ASI:One with the item, amount and risk reasons, and the human repli
 resolves the challenge with the shared GUARDIAN_TOKEN the Shopper never has. A hijacked Shopper can't approve itself.
 """
 
+import re
+
 import httpx
 from uagents import Agent, Context, Protocol
 from uagents_core.contrib.protocols.chat import ChatAcknowledgement, ChatMessage, StartSessionContent, chat_protocol_spec
 
 from agents import common
-from agents.common import ack_for, env, message_text, reasons_text, text_message
+from agents.common import ack_for, consumer_id_for, env, message_text, reasons_text, text_message
 from agents.guardian import webhook
 
 common.load_env()
@@ -19,6 +21,11 @@ GATEWAY_URL = env("GATEWAY_URL", "http://localhost:8000").rstrip("/")
 GUARDIAN_TOKEN = env("GUARDIAN_TOKEN")
 WEBHOOK_PORT = int(env("GUARDIAN_WEBHOOK_PORT", "8001"))
 OWNER = env("GUARDIAN_OWNER")  # optional: pin the human's agent address; otherwise the first person to talk to it
+# Strict: only the owner's own orders. Default: any order placed by the Shopper agent for an ASI:One user
+# (consumer ids look like consumer_id_for()), which hides simulator and test traffic but tolerates ASI:One giving
+# the person a different sender address per agent.
+STRICT = env("GUARDIAN_STRICT") in {"1", "true", "yes", "on"}
+_SHOPPER_CONSUMER = re.compile(r"c-[0-9a-f]{10}")
 
 agent = Agent(
     name="agentgate-guardian",
@@ -101,8 +108,20 @@ async def resolve(cid: str, approved: bool) -> str:
     return f"gateway returned {r.status_code}"
 
 
-def _pick(cid_prefix: str | None) -> dict | None:
-    items = webhook.list_pending()
+def is_mine(event: dict, owner: str | None) -> bool:
+    """Should this challenge go to this Guardian's human?"""
+    consumer = str(event.get("consumer_id") or "")
+    if owner and consumer == consumer_id_for(owner):
+        return True
+    return not STRICT and bool(_SHOPPER_CONSUMER.fullmatch(consumer))
+
+
+def _visible(owner: str | None) -> list[dict]:
+    return [e for e in webhook.list_pending() if is_mine(e, owner)]
+
+
+def _pick(cid_prefix: str | None, owner: str | None = None) -> dict | None:
+    items = _visible(owner)
     if not items:
         return None
     if cid_prefix:
@@ -154,7 +173,7 @@ async def handle(ctx: Context, text: str) -> str:
     if verb in {"deny", "no", "block", "reject", "decline", "n"}:
         return await _answer(ctx, prefix, approved=False)
     if verb in {"pending", "status", "open", "list"}:
-        items = webhook.list_pending()
+        items = _visible(_owner(ctx))
         if not items:
             return "No open requests. I'll message you the moment the store flags something."
         return "Open requests:\n\n" + "\n\n".join(card_text(e) for e in items)
@@ -162,7 +181,7 @@ async def handle(ctx: Context, text: str) -> str:
 
 
 async def _answer(ctx: Context, prefix: str | None, approved: bool) -> str:
-    event = _pick(prefix)
+    event = _pick(prefix, _owner(ctx))
     if event is None:
         return "There's nothing waiting for your answer right now." if not prefix else f"I don't have a request starting with {prefix}."
     cid = event["challenge_id"]
@@ -183,6 +202,10 @@ async def deliver(ctx: Context):
         return
     owner = _owner(ctx)
     for event in new:
+        if not is_mine(event, owner):
+            webhook.pop_pending(event.get("challenge_id", ""))
+            ctx.logger.info(f"challenge {event.get('challenge_id')} is for consumer {event.get('consumer_id')}, not this Guardian's human; ignored")
+            continue
         if owner:
             await ctx.send(owner, text_message(card_text(event)))
             ctx.logger.info(f"challenge {event.get('challenge_id')} shown to {owner}")
@@ -203,7 +226,7 @@ async def poll_fallback(ctx: Context):
         rows = rows.get("challenges", rows) if isinstance(rows, dict) else rows
         for row in rows:
             event = row.get("event", row) if isinstance(row, dict) else None
-            if event and webhook.add_pending({**event, "challenge_id": row.get("challenge_id") or event.get("challenge_id")}):
+            if event and is_mine(event, _owner(ctx)) and webhook.add_pending({**event, "challenge_id": row.get("challenge_id") or event.get("challenge_id")}):
                 ctx.logger.info(f"picked up challenge {event.get('challenge_id')} by polling")
     except (httpx.HTTPError, ValueError, AttributeError):
         pass

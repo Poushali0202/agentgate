@@ -47,6 +47,20 @@ Each prints an Agentverse inspector link on first start. Open it, connect the ma
 | `TRAP_PAGE_URL` | — | Shopper hijack mode: the page with the hidden instruction |
 | `PRODUCTS_JSON` | — | Shopper: Apify product output (file or URL). Falls back to `/store/products`. |
 | `HIJACK` | `0` | Shopper. `1` = demo-only compromise. Say so in the pitch. |
+| `GUARDIAN_STRICT` | `0` | Guardian. `1` = show only the owner's own orders. Default: any order the Shopper placed for an ASI:One user; simulator and test traffic is never shown. |
+
+**The Shopper never holds `GUARDIAN_TOKEN`.** Even if both agents share one `.env`, the Shopper drops the token at startup and logs that it did. Only the Guardian can approve or deny.
+
+## Rehearse without ASI:One
+
+`agents/rehearse.py` drives the real Shopper and Guardian handler code against a gateway, without Agentverse: say hi to the Guardian → normal purchase (allow) → simulator swarm (not shown to the human) → `HIJACK` purchase from the trap page (challenge) → Guardian card → "deny" → blocked.
+
+```bash
+CHALLENGE_WEBHOOK_URL=http://127.0.0.1:8011/challenge .venv/bin/uvicorn gateway.app:app --port 8010 &
+GATEWAY_URL=http://localhost:8010 .venv/bin/python -m agents.rehearse
+```
+
+In the live demo, **make one normal purchase before the hijack.** The drift rules need a completed purchase as a baseline.
 
 ## What is real and what is staged
 
