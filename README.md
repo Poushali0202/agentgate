@@ -59,6 +59,7 @@ A signature proves who the agent is. It does not prove the agent is behaving. Ag
 | Hijacked verified agent: gift cards to a new address | challenged → human denies → blocked; self-approval refused (401) |
 | Slow-and-low: 6 agents, one order each, one shared card | velocity rules fired on 0 / 6; `cluster` caught 4 / 6 |
 | Precision / recall over a full run of all five scenarios | 99.5% / 99.1% (1 false alarm in 17 good orders: a gift to a new address) |
+| Apify Actor on the trap pages (run on the Apify platform) | poisoned page `high` (6 injection patterns, hidden off-screen), safe page `low`, both read as product `HP-100` |
 | Gateway latency (verify → score → decide), all five scenarios | p50 0.18 ms, p95 0.41 ms |
 | Load: 2,000 signed checkouts from distinct agents | p95 0.74 ms gateway, 1.33 ms round-trip; 923 req/s from one client |
 
@@ -71,7 +72,7 @@ gateway/      FastAPI gateway: signature verification, scoring, policy, event lo
 agents/       Fetch.ai uAgents on Agentverse: the Shopper (buys on your behalf) and the Guardian (confirms with you)
 simulator/    Scripted traffic: good agents, spoofed agents, a scalper swarm, a hijacked verified agent, a slow-and-low scalper
 dashboard/    Live decision feed, security test matrix, precision/recall, threshold sliders
-apify/        Apify e-commerce scraper adapter: product data, with injected instructions flagged
+apify/        Our Apify Actor (Agent Prompt-Injection Scanner) + adapter that feeds scraped products to the shopper
 trap-page/    Product pages for the demo; one hides a prompt injection (published via GitHub Pages)
 investigator/ Claude with one read-only tool over the decision log: "why was the last block flagged?"
 ```

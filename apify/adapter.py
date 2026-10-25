@@ -264,11 +264,78 @@ def save_products(
     return output_path
 
 
+def run_scanner(actor_id: str, urls: list[str]) -> list[dict[str, Any]]:
+    """
+    Run our Agent Prompt-Injection Scanner Actor (apify/actor/) on the
+    Apify platform and return its dataset items.
+    """
+    token = os.environ.get("APIFY_API_TOKEN")
+
+    if not token:
+        raise RuntimeError("APIFY_API_TOKEN is missing (put it in the repo's .env).")
+
+    response = requests.post(
+        f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"startUrls": [{"url": url} for url in urls]},
+        timeout=300
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+def scanner_to_products(rows: list[dict[str, Any]], actor_id: str) -> list[dict[str, Any]]:
+    """
+    Convert scanner rows into the shared product format the shopper reads.
+    """
+    products = []
+
+    for row in rows:
+        product = row.get("product") or {}
+
+        if row.get("risk") == "error" or not product.get("sku"):
+            continue
+
+        products.append({
+            "sku": product["sku"],
+            "product_id": product["sku"],
+            "name": product.get("name") or "Unknown product",
+            "price": product.get("price"),
+            "currency": product.get("currency") or "USD",
+            "category": product.get("category"),
+            "source_url": row["url"],
+            "risk": row["risk"],
+            "untrusted_instructions_detected": row["risk"] in ("high", "medium"),
+            "detected_patterns": row.get("injection_patterns", []),
+            "hidden_text": [f["text"] for f in row.get("findings", []) if f["where"] != "visible"],
+            "scraper": actor_id
+        })
+
+    return products
+
+
+def _load_dotenv() -> None:
+    env = Path(__file__).resolve().parent.parent / ".env"
+
+    if not env.exists():
+        return
+
+    for line in env.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.strip().partition("=")
+
+        if sep and key and not key.startswith("#") and value.strip() and key.strip() not in os.environ:
+            os.environ[key.strip()] = value.strip().strip('"').strip("'")
+
+
 def main() -> None:
+    _load_dotenv()
+
     parser = argparse.ArgumentParser(
         description=(
-            "Run Apify's e-commerce scraper and "
-            "normalize the results for AgentGate."
+            "Run Apify's e-commerce scraper (or our prompt-injection "
+            "scanner Actor) and normalize the results for AgentGate."
         )
     )
 
@@ -282,7 +349,33 @@ def main() -> None:
         )
     )
 
+    parser.add_argument(
+        "--scanner",
+        nargs="?",
+        const=os.environ.get("APIFY_SCANNER_ACTOR", ""),
+        default=None,
+        help=(
+            "Use our Agent Prompt-Injection Scanner Actor instead, e.g. "
+            "--scanner username~agent-prompt-injection-scanner "
+            "(defaults to APIFY_SCANNER_ACTOR)."
+        )
+    )
+
     args = parser.parse_args()
+
+    if args.scanner is not None:
+        if not args.scanner:
+            parser.error("--scanner needs an Actor id, or set APIFY_SCANNER_ACTOR in .env")
+
+        print(f"Running {args.scanner} on {len(args.url)} URL(s)...")
+        products = scanner_to_products(run_scanner(args.scanner, args.url), args.scanner)
+        output_path = save_products(products)
+        print(f"Saved {len(products)} product(s) to: {output_path}")
+
+        for product in products:
+            print(f"- {product['sku']} {product['name']}: risk = {product['risk']} {product['detected_patterns']}")
+
+        return
 
     print("Starting Apify e-commerce scraper...")
     print(f"URLs: {len(args.url)}")
