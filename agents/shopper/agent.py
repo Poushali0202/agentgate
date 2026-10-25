@@ -67,8 +67,19 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
     text = message_text(msg)
     if not text:
         return
-    if text.lower().strip(" !.?") in {"hi", "hello", "hey", "help", "what can you do", "start"}:
+    command = text.lower().strip(" !.?")
+    if command in {"hi", "hello", "hey", "help", "what can you do", "start"}:
         await ctx.send(sender, text_message(HELP))
+        return
+    if command in {"hijack on", "hijack off", "hijack status"}:
+        # The labelled demo switch, flipped from the chat so Scene 1 -> Scene 4 needs no restart.
+        if command != "hijack status":
+            hijack.set_enabled(command.endswith("on"))
+            ctx.logger.info(f"hijack mode set from chat: {'ON' if hijack.enabled() else 'off'}")
+        state = ("[HIJACK MODE] ON — demo-only. On the next purchase I will follow the hidden instruction on the trap page "
+                 "instead of what you asked for. The store's gateway doesn't know this.") if hijack.enabled() else \
+                "[HIJACK MODE] off — normal shopping."
+        await ctx.send(sender, text_message(state))
         return
     try:
         reply = await shop(ctx, sender, text)
