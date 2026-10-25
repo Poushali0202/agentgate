@@ -4,21 +4,131 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AgentGate · Merchant console</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0c1420;color:#e5edf7}body{max-width:1280px;margin:auto;padding:32px}header{display:flex;align-items:center;justify-content:space-between;gap:20px}h1{margin:0;font-size:32px}h2{font-size:17px}p,.muted{color:#9aabc1}section{background:#131f30;border:1px solid #29384e;border-radius:14px;padding:20px;margin:20px 0}.counters{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.counters section{margin:0}.count{font-size:36px;font-weight:650}.allow{color:#62ddb2}.challenge{color:#ffcf73}.block{color:#ff8698}label{display:inline-block;margin-right:32px}button{background:#acd3ff;color:#142238;padding:9px 16px;border:0;border-radius:7px;cursor:pointer}input{vertical-align:middle}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:13px 10px;text-align:left;border-bottom:1px solid #29384e}th{color:#9aabc1}code{font-size:12px}#feed{overflow:auto}#status[role=alert]{color:#ff8698}@media(max-width:700px){body{padding:15px}.counters{gap:8px}header{align-items:start;flex-direction:column}label{display:block;margin:12px 0}}
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0c1420;color:#e5edf7;--panel:#131f30;--line:#29384e;--muted:#9aabc1;--allow:#62ddb2;--challenge:#ffcf73;--block:#ff8698;--accent:#acd3ff}
+*{box-sizing:border-box}body{max-width:1320px;margin:auto;padding:28px}header{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}h1{margin:0;font-size:30px}h2{font-size:16px;margin:0 0 12px}p,.muted{color:var(--muted)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin:16px 0}
+.grid{display:grid;gap:14px}.tiles{grid-template-columns:repeat(6,1fr)}.two{grid-template-columns:1.1fr .9fr}.tiles section{margin:0;padding:14px}
+.count{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums}.small{font-size:12px}.allow{color:var(--allow)}.challenge{color:var(--challenge)}.block{color:var(--block)}
+button{background:var(--accent);color:#142238;padding:9px 14px;border:0;border-radius:7px;cursor:pointer;font-weight:600}button:disabled{opacity:.45;cursor:wait}button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.buttons{display:flex;flex-wrap:wrap;gap:8px}label{display:inline-block;margin-right:28px}input[type=text]{width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--line);background:#0c1420;color:inherit;font:inherit}
+table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font:12px ui-monospace,Menlo,monospace;padding:1px 6px;margin:1px 3px 1px 0;border:1px solid var(--line);border-radius:4px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:650;font-size:12px;background:#0c1420}
+pre{white-space:pre-wrap;margin:0;font:12.5px/1.5 ui-monospace,Menlo,monospace;color:#cfdbea;max-height:260px;overflow:auto}
+.answer{white-space:pre-wrap;line-height:1.5;margin-top:12px}.bar{display:flex;gap:10px;align-items:center}.verdict{font-size:18px;font-weight:650}
+#feed{overflow:auto;max-height:520px}#status[role=alert]{color:var(--block)}
+@media(max-width:900px){.tiles{grid-template-columns:repeat(3,1fr)}.two{grid-template-columns:1fr}}
+@media(max-width:560px){body{padding:16px}.tiles{grid-template-columns:repeat(2,1fr)}label{display:block;margin:10px 0}}
 </style>
 <header><div><h1>AgentGate</h1><p>Merchant console · Identity verified. Behavior evaluated.</p></div><span id="status" role="status">Connecting…</span></header>
-<div class="counters"><section><div class="muted">Allowed</div><div id="allow" class="count allow">0</div></section><section><div class="muted">Challenged</div><div id="challenge" class="count challenge">0</div></section><section><div class="muted">Blocked</div><div id="block" class="count block">0</div></section></div>
-<p class="muted">Counters cover the latest 100 decision records. A challenge and its resolution each appear as a record.</p>
+
+<div class="grid tiles">
+  <section><div class="muted small">Allowed</div><div id="n-allow" class="count allow">0</div></section>
+  <section><div class="muted small">Challenged</div><div id="n-challenge" class="count challenge">0</div></section>
+  <section><div class="muted small">Blocked</div><div id="n-block" class="count block">0</div></section>
+  <section><div class="muted small">Pending with Guardian</div><div id="n-pending" class="count">0</div></section>
+  <section><div class="muted small">p95 latency</div><div id="p95" class="count">–</div></section>
+  <section><div class="muted small">Signature tests</div><div id="sec" class="count">–</div><div id="sec-detail" class="muted small"></div></section>
+</div>
+
+<div class="grid two">
+  <section>
+    <h2>Run a scenario</h2>
+    <div class="buttons" id="scenarios">
+      <button data-s="good">Good shoppers</button><button data-s="spoof">Spoofed agents</button><button data-s="scalper">Scalper swarm</button><button data-s="hijacked">Hijacked agent</button><button data-s="slow_low">Slow-and-low</button>
+    </div>
+    <p class="small muted">Simulated traffic, real signatures. Each run uses fresh agents. Challenges go to the real Guardian first; if no one answers, the simulator plays the human.</p>
+    <pre id="runlog">No runs yet.</pre>
+  </section>
+  <section>
+    <h2>Detection quality <span class="muted small">(from simulator ground truth)</span></h2>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      <div><div class="muted small">Precision</div><div id="precision" class="count">–</div></div>
+      <div><div class="muted small">Recall</div><div id="recall" class="count">–</div></div>
+      <div><div class="muted small">False alarms</div><div id="far" class="count">–</div></div>
+    </div>
+    <table style="margin-top:10px"><thead><tr><th>Scenario</th><th class="num">Requests</th><th class="num">Allow</th><th class="num">Challenge</th><th class="num">Block</th></tr></thead><tbody id="per"></tbody></table>
+    <div style="margin-top:14px" id="slowlow"><div class="muted small">Slow-and-low</div><div class="muted">Run the slow-and-low scenario to see it.</div></div>
+  </section>
+</div>
+
+<section>
+  <h2>Ask the investigator</h2>
+  <form id="ask" class="bar"><input id="question" type="text" value="Why was the last block flagged?"><button id="askBtn">Ask Claude</button></form>
+  <div id="answer" class="answer muted">Claude reads this decision log through one read-only tool and explains decisions with rule IDs.</div>
+</section>
+
 <section><h2>Decision thresholds</h2><form id="policy"><label>Challenge at <output id="challengeValue">30</output> <input id="challengeAt" type="range" min="0" max="99" value="30"></label><label>Block at <output id="blockValue">70</output> <input id="blockAt" type="range" min="1" max="100" value="70"></label><button>Apply thresholds</button><p id="policyMessage" role="status">Drift reasons always require human confirmation. Thresholds reset when the gateway restarts.</p></form></section>
-<section><h2>Live decisions</h2><div id="feed"><table><thead><tr><th>Time</th><th>Agent / consumer</th><th>Decision</th><th>Risk</th><th>Reasons</th><th>Latency</th></tr></thead><tbody id="rows"><tr><td colspan="6">Waiting for the first checkout. Send a signed request to see it here.</td></tr></tbody></table></div></section>
+
+<section><h2>Live decisions</h2><div id="feed"><table><thead><tr><th>Time</th><th>Scenario</th><th>Agent / consumer</th><th>Decision</th><th class="num">Risk</th><th>Reasons</th><th class="num">Latency</th></tr></thead><tbody id="rows"><tr><td colspan="7">Waiting for the first checkout. Run a scenario or send a signed request.</td></tr></tbody></table></div></section>
+
 <script>
 const $=id=>document.getElementById(id);
-async function request(path,options){const r=await fetch(path,options);if(!r.ok)throw new Error(`${path}: HTTP ${r.status}`);return r.json()}
-function cell(row,value){const td=document.createElement('td');td.textContent=value;row.append(td);return td}
-async function refresh(){try{const events=await request('/events?limit=100');const counts={allow:0,challenge:0,block:0};const fragment=document.createDocumentFragment();for(const e of events){if(Object.hasOwn(counts,e.decision))counts[e.decision]++;const row=document.createElement('tr');cell(row,new Date(e.ts).toLocaleTimeString());cell(row,`${e.agent_keyid||'Unsigned'} / ${e.consumer_id||'—'}`);const decision=cell(row,e.decision);if(Object.hasOwn(counts,e.decision))decision.className=e.decision;cell(row,e.risk_score);cell(row,(e.reasons||[]).join(', '));cell(row,`${Number(e.latency_ms).toFixed(2)} ms`);fragment.append(row)}if(!events.length){const row=document.createElement('tr');cell(row,'Waiting for the first checkout.').colSpan=6;fragment.append(row)}$('rows').replaceChildren(fragment);for(const [key,value] of Object.entries(counts))$(key).textContent=value;$('status').textContent=`Live · updated ${new Date().toLocaleTimeString()}`;$('status').setAttribute('role','status')}catch(e){$('status').textContent=`Disconnected · ${e.message}. Retrying…`;$('status').setAttribute('role','alert')}finally{setTimeout(refresh,1000)}}
-function values(){ $('challengeValue').value=$('challengeAt').value;$('blockValue').value=$('blockAt').value }
+const INVESTIGATOR=new URLSearchParams(location.search).get('investigator')||'http://localhost:8020';
+const RESOLUTION=new Set(['human_approved','human_denied','guardian_timeout']);
+async function request(path,options){const r=await fetch(path,options);if(!r.ok){let d='';try{d=(await r.json()).detail}catch{}throw new Error(d||`${path}: HTTP ${r.status}`)}return r.json()}
+function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
+function cell(row,value,cls){const td=el('td',value,cls);row.append(td);return td}
+const pct=v=>v==null?'–':`${(v*100).toFixed(1)}%`;
+
+async function refreshFeed(){
+  const events=await request('/events?limit=200');
+  const resolved=new Set(events.filter(e=>e.challenge_id&&RESOLUTION.has((e.reasons||[])[0])).map(e=>e.challenge_id));
+  $('n-pending').textContent=events.filter(e=>e.decision==='challenge'&&!resolved.has(e.challenge_id)).length;
+  const frag=document.createDocumentFragment();
+  for(const e of events.slice(0,80)){
+    const row=el('tr');cell(row,new Date(e.ts).toLocaleTimeString());cell(row,e.scenario||'live');
+    cell(row,`${e.agent_keyid||'Unsigned'} / ${e.consumer_id||'—'}`);
+    const d=cell(row,'');d.append(el('span',e.decision,`pill ${e.decision}`));
+    cell(row,e.risk_score,'num');
+    const r=cell(row,'');for(const x of e.reasons||[])r.append(el('span',x,'chip'));
+    cell(row,`${Number(e.latency_ms).toFixed(2)} ms`,'num');frag.append(row)}
+  if(!events.length){const row=el('tr');cell(row,'Waiting for the first checkout.').colSpan=7;frag.append(row)}
+  $('rows').replaceChildren(frag);
+}
+async function refreshStats(){
+  const s=await request('/stats');
+  for(const k of ['allow','challenge','block'])$(`n-${k}`).textContent=s.decisions[k]||0;
+  $('p95').textContent=s.latency_ms.p95==null?'–':`${s.latency_ms.p95.toFixed(2)} ms`;
+}
+async function refreshMetrics(){
+  const m=await request('/sim/metrics');
+  $('precision').textContent=pct(m.precision);$('recall').textContent=pct(m.recall);$('far').textContent=pct(m.false_alarm_rate);
+  const frag=document.createDocumentFragment();
+  for(const s of ['good','spoof','scalper','hijacked','slow_low']){const p=m.per_scenario[s];if(!p)continue;
+    const row=el('tr');cell(row,s);cell(row,p.n,'num');cell(row,p.allow,'num allow');cell(row,p.challenge,'num challenge');cell(row,p.block,'num block');frag.append(row)}
+  $('per').replaceChildren(frag);
+  const sl=m.slow_low;if(sl.n){
+    const box=$('slowlow');box.replaceChildren(el('div',`Slow-and-low: ${sl.n} orders, each from a different agent, one shared card`,'muted small'));
+    const v=el('div','','verdict');
+    v.append(el('span',`velocity rules: ${sl.velocity_fired?'fired on '+sl.velocity_fired:'missed all '+sl.n}`,sl.velocity_fired?'allow':'block'));
+    v.append(document.createTextNode('  ·  '));
+    v.append(el('span',`cluster: ${sl.cluster_fired?'caught '+sl.cluster_fired+' of '+sl.n:'missed'}`,sl.cluster_fired?'allow':'block'));
+    box.append(v,el('div',`Per-agent speed checks see one normal order each. Linking the agents by their shared card catches the ring from the third order.`,'muted small'))}
+}
+async function refreshRuns(){
+  const runs=await request('/sim/runs');const busy=runs.some(r=>r.status==='running');
+  for(const b of $('scenarios').querySelectorAll('button'))b.disabled=busy;
+  if(runs.length){const r=runs[0];$('runlog').textContent=`▶ ${r.scenario} — ${r.status}\n`+r.log.join('\n')}
+}
+async function refresh(){
+  try{await Promise.all([refreshFeed(),refreshStats(),refreshMetrics(),refreshRuns()]);
+    $('status').textContent=`Live · updated ${new Date().toLocaleTimeString()}`;$('status').setAttribute('role','status')}
+  catch(e){$('status').textContent=`Disconnected · ${e.message}. Retrying…`;$('status').setAttribute('role','alert')}
+  finally{setTimeout(refresh,1000)}
+}
+$('scenarios').addEventListener('click',async e=>{const s=e.target.dataset.s;if(!s)return;
+  try{await request(`/sim/run/${s}`,{method:'POST'});refreshRuns()}catch(err){$('runlog').textContent=err.message}});
+$('ask').addEventListener('submit',async e=>{e.preventDefault();$('askBtn').disabled=true;$('answer').className='answer muted';$('answer').textContent='Claude is reading the decision log…';
+  try{const r=await request(`${INVESTIGATOR}/investigate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:$('question').value})});
+    $('answer').className='answer';$('answer').textContent=r.answer}
+  catch(err){$('answer').textContent=`Investigator not reachable at ${INVESTIGATOR} (${err.message}). Start it: cd investigator && ../.venv/bin/uvicorn app:app --port 8020`}
+  finally{$('askBtn').disabled=false}});
+function values(){$('challengeValue').value=$('challengeAt').value;$('blockValue').value=$('blockAt').value}
 for(const id of ['challengeAt','blockAt'])$(id).addEventListener('input',values);
 $('policy').addEventListener('submit',async e=>{e.preventDefault();const challenge_at=Number($('challengeAt').value),block_at=Number($('blockAt').value);if(challenge_at>=block_at){$('policyMessage').textContent='Challenge must be below block.';return}try{await request('/policy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({challenge_at,block_at})});$('policyMessage').textContent='Thresholds saved. New checkouts use these values.'}catch(error){$('policyMessage').textContent=error.message}});
-request('/policy').then(p=>{$('challengeAt').value=p.challenge_at;$('blockAt').value=p.block_at;values()}).catch(e=>{$('policyMessage').textContent=e.message});refresh();
+request('/policy').then(p=>{$('challengeAt').value=p.challenge_at;$('blockAt').value=p.block_at;values()}).catch(e=>{$('policyMessage').textContent=e.message});
+request('/security-tests').then(s=>{$('sec').textContent=`${s.passed}/${s.total}`;$('sec').className=`count ${s.passed===s.total?'allow':'block'}`;$('sec-detail').textContent=s.cases.map(c=>c.name).join(' · ')}).catch(()=>{});
+refresh();
 </script>
 </html>
