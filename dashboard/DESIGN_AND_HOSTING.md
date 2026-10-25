@@ -27,8 +27,11 @@ contains consumer identifiers and purchase details. Separate merchant access
 from the signed agent checkout routes. Run the five signature security cases
 through the deployed proxy as well as a normal signed checkout.
 
-Provisioning is pending a server target, access method, domain if available,
-and a budget if creating a new instance. No server has been provisioned.
+A Vultr server has been deployed in Silicon Valley: one vCPU, 2 GB RAM,
+55 GB SSD, Ubuntu 24.04 LTS, with automatic backups ($12/month total).
+Public HTTPS URL: https://agentgate.149-28-201-108.sslip.io/
+Merchant routes require authentication. Credentials and deployment keys stay
+outside this repository.
 
 ## Figma design brief
 
@@ -51,12 +54,16 @@ meaning never depends on color. Use readable tables, restrained motion,
 visible keyboard focus and distinct loading, empty, disconnected and error
 states. On phones, allow the decision table to scroll without clipping controls.
 
-Existing implementation: items 1–3 and 5. Remaining panels need their scenario
-and metrics behavior implemented before they can display real results.
+Implemented: live feed, event inspection, counters, policy controls, five
+scenario buttons, measured detection metrics, slow-low comparison, security
+checks, investigator integration and the Apify storefront scan panel.
+A real Guardian webhook and Anthropic/Apify credentials require configuration.
+The simulator and investigator provide explicitly labeled local fallbacks.
 Do not present simulated example values as measured live results.
 
-Figma is the editable design source. Implement the approved design in the
-repository's frontend and deploy that code with FastAPI on Vultr.
+The implemented frontend is the reference for an editable Figma design.
+Figma connection and document creation remain pending; no Figma file has
+yet been created.
 
 ## Verification before handoff
 

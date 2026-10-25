@@ -25,7 +25,7 @@ from gateway import envfile
 
 envfile.load()  # before the imports below read their config from os.environ
 
-from gateway import db, latency, security_tests, store  # noqa: E402
+from gateway import db, latency, security_tests, store, storefront  # noqa: E402
 from gateway.directory import Directory  # noqa: E402
 from gateway.verify import Verifier  # noqa: E402
 
@@ -93,6 +93,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 for _mod in (_policy, _simulator):
     if _mod is not None and hasattr(_mod, "router"):
         app.include_router(_mod.router)
+app.include_router(storefront.router)  # GET /storefront-scan, POST /storefront-scan/run (Apify)
 
 
 def _now_iso() -> str:
