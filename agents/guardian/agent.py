@@ -143,15 +143,20 @@ def _card_selection(text: str) -> tuple[str, str | None] | None:
         data = json.loads(text)
     except (json.JSONDecodeError, TypeError):
         data = None
-    if isinstance(data, dict) and data.get("action") in {"approve", "deny"}:
-        return data["action"], str(data.get("challenge_id") or "") or None
+    if isinstance(data, dict) and data.get("action") in {"approve", "deny"} and data.get("challenge_id"):
+        return data["action"], str(data["challenge_id"])
     if text.lstrip().startswith("{"):
         return None
+    # Prose (planner-routed tap). Be strict: it must be short, name a request id, and must not be the card's own
+    # wording echoed back ("Reply approve or deny… (request …)"), which would make the Guardian answer itself.
+    lowered = text.lower()
+    if len(text) > 240 or "guardian check" in lowered or 'reply "approve"' in lowered or "reply approve" in lowered:
+        return None
     m = _PROSE_ACTION.search(text)
-    if m and ("challenge" in text.lower() or "request" in text.lower() or _CID.search(text)):
+    c = _CID.search(text)
+    if m and c:
         action = "approve" if m.group(1).lower().startswith("approv") else "deny"
-        c = _CID.search(text)
-        return action, (c.group(1) if c else None)
+        return action, c.group(1)
     return None
 
 
@@ -217,10 +222,12 @@ async def startup(ctx: Context):
 @chat.on_message(ChatMessage)
 async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
     await ctx.send(sender, ack_for(msg))
-    if not OWNER and not ctx.storage.get("owner"):
-        ctx.storage.set("owner", sender)
-        ctx.logger.info(f"owner set to {sender}")
     text = message_text(msg).strip()
+    ctx.logger.info(f"from {sender[:14]}…: {text[:120]!r}")
+    # ASI:One gives the person a different sender address per conversation, so follow the chat they last spoke from.
+    if not OWNER and ctx.storage.get("owner") != sender:
+        ctx.storage.set("owner", sender)
+        ctx.logger.info(f"owner is now {sender}")
     if any(isinstance(c, StartSessionContent) for c in msg.content) and not text:
         await ctx.send(sender, text_message(HELP))
         return
