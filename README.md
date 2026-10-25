@@ -9,6 +9,12 @@ AgentGate is a merchant-side firewall for AI shopping agents. It sits in front o
 
 Built at [Cal Hacks 13.0](https://calhacks.io), October 24–26 2026, San Francisco.
 
+## Demo
+
+- [Watch the AgentGate demo on YouTube](https://youtu.be/WV-EeoDREGo?is=RZibACzEkpZ84gpz)
+- [Open the live merchant dashboard](https://agentgate.149-28-196-135.sslip.io/) — public judging demo; no website password required.
+- [View the Devpost submission](https://devpost.com/software/agentgate-bdstoz)
+
 ## The problem
 
 Merchants are about to see a flood of AI agents buying on behalf of real people. Today they classify bots by user-agent string and IP address, both trivially spoofed. So they either block every agent and lose real sales, or let them all in and eat scalping, card testing and inventory hoarding.
