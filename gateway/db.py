@@ -9,12 +9,17 @@ import os
 import sqlite3
 import threading
 import time
+from collections import deque
 
 DB_PATH = os.environ.get("GATEWAY_DB_PATH", "gateway/data/events.db")
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
 _last_browse: dict[tuple[str, str], float] = {}
+# Recent events kept parsed in memory, so scoring's windowed lookups don't re-read and re-parse SQLite
+# on every checkout. Holds RECENT_WINDOW_S of history; longer windows fall back to SQLite.
+RECENT_WINDOW_S = 3600
+_recent: deque[tuple[float, dict]] = deque()
 
 
 def init(path: str | None = None) -> None:
@@ -40,16 +45,23 @@ def init(path: str | None = None) -> None:
     _conn.execute("CREATE INDEX IF NOT EXISTS ix_events_epoch ON events(epoch)")
     _conn.execute("CREATE INDEX IF NOT EXISTS ix_events_consumer ON events(consumer_id)")
     _conn.commit()
+    _recent.clear()
+    rows = _conn.execute("SELECT epoch, body FROM events WHERE epoch >= ? ORDER BY seq", (time.time() - RECENT_WINDOW_S,))
+    _recent.extend((epoch, json.loads(body)) for epoch, body in rows)
 
 
 def insert_event(event: dict) -> None:
+    now = time.time()
     with _lock:
         _conn.execute(
             "INSERT INTO events (request_id, ts, epoch, agent_keyid, consumer_id, decision, scenario, body) VALUES (?,?,?,?,?,?,?,?)",
-            (event["request_id"], event["ts"], time.time(), event.get("agent_keyid"), event.get("consumer_id"),
+            (event["request_id"], event["ts"], now, event.get("agent_keyid"), event.get("consumer_id"),
              event.get("decision"), event.get("scenario"), json.dumps(event)),
         )
         _conn.commit()
+        _recent.append((now, json.loads(json.dumps(event))))  # a snapshot: later edits to `event` don't leak in
+        while _recent and _recent[0][0] < now - RECENT_WINDOW_S:
+            _recent.popleft()
 
 
 def _rows(sql: str, args: tuple) -> list[dict]:
@@ -63,8 +75,18 @@ def recent_events(limit: int = 100) -> list[dict]:
 
 
 def events_since(seconds: float) -> list[dict]:
-    """All events in the last `seconds`, oldest first."""
-    return _rows("SELECT body FROM events WHERE epoch >= ? ORDER BY seq", (time.time() - seconds,))
+    """All events in the last `seconds`, oldest first. Treat the returned dicts as read-only."""
+    cutoff = time.time() - seconds
+    if seconds > RECENT_WINDOW_S:
+        return _rows("SELECT body FROM events WHERE epoch >= ? ORDER BY seq", (cutoff,))
+    with _lock:
+        out = []
+        for epoch, event in reversed(_recent):
+            if epoch < cutoff:
+                break
+            out.append(event)
+    out.reverse()
+    return out
 
 
 def consumer_events(consumer_id: str) -> list[dict]:
@@ -90,4 +112,5 @@ def clear() -> None:
     with _lock:
         _conn.execute("DELETE FROM events")
         _conn.commit()
+        _recent.clear()
     _last_browse.clear()

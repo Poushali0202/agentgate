@@ -222,3 +222,14 @@ def test_key_age_survives_restart(tmp_path):
     d2 = Directory(path)
     assert d2.first_seen("old-agent") == d1.first_seen("old-agent")
     assert "registered_at" not in d2.jwks()["keys"][0]
+
+
+def test_recent_window_matches_sqlite(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "w.db"))
+    db.init()
+    for i in range(5):
+        db.insert_event({"request_id": f"r{i}", "ts": "t", "consumer_id": "c", "decision": "allow", "reasons": []})
+    from_sqlite = db._rows("SELECT body FROM events WHERE epoch >= ? ORDER BY seq", (0,))
+    assert db.events_since(600) == from_sqlite and len(from_sqlite) == 5
+    db.init()  # restart: window reloads from disk
+    assert [e["request_id"] for e in db.events_since(600)] == ["r0", "r1", "r2", "r3", "r4"]
