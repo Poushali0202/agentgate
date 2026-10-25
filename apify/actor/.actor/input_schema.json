@@ -1,0 +1,18 @@
+{
+    "title": "Agent Prompt-Injection Scanner input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "startUrls": {
+            "title": "Pages to scan",
+            "type": "array",
+            "description": "Product or content pages an AI agent is about to read.",
+            "editor": "requestListSources",
+            "prefill": [
+                { "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/main/trap-page/malicious-product.html" },
+                { "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/main/trap-page/safe-product.html" }
+            ]
+        }
+    },
+    "required": ["startUrls"]
+}

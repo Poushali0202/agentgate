@@ -1,0 +1,11 @@
+{
+    "actorSpecification": 1,
+    "name": "agent-prompt-injection-scanner",
+    "title": "Agent Prompt-Injection Scanner",
+    "description": "Scans web pages for instructions hidden from humans but aimed at AI shopping agents (hidden text, off-screen elements, comments), and extracts the page's product data. Run it before your agent reads a page.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "input": "./input_schema.json",
+    "dockerfile": "../Dockerfile",
+    "readme": "../README.md"
+}
