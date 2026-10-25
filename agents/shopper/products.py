@@ -48,7 +48,14 @@ def _tokens(s: str) -> list[str]:
 
 
 async def catalogue(client: httpx.AsyncClient, gateway_url: str) -> list[dict]:
+    """Apify-scraped products first, then the rest of the store. Scraped rows are kept only if the store sells
+    that SKU, and take the store's price: the gateway prices orders itself and rejects unknown SKUs."""
+    r = await client.get(f"{gateway_url}/store/products", timeout=10)
+    r.raise_for_status()
+    store = {p["sku"]: p for p in r.json()}
+
     source = env("PRODUCTS_JSON")
+    data = None
     if source:
         if source.startswith("http://") or source.startswith("https://"):
             r = await client.get(source, timeout=15)
@@ -57,21 +64,26 @@ async def catalogue(client: httpx.AsyncClient, gateway_url: str) -> list[dict]:
         elif os.path.exists(source):
             with open(source, encoding="utf-8") as f:
                 data = json.load(f)
-        else:
-            data = None
         if isinstance(data, dict):
             data = data.get("products") or data.get("items") or []
-        if data:
-            return [_normalise(p) for p in data if isinstance(p, dict)]
-    r = await client.get(f"{gateway_url}/store/products", timeout=10)
-    r.raise_for_status()
-    return r.json()
+
+    scraped, seen = [], set()
+    for p in data or []:
+        item = _normalise(p) if isinstance(p, dict) else {}
+        sku = item.get("sku")
+        if sku not in store or sku in seen:
+            continue
+        seen.add(sku)
+        name = item["name"] if item["name"] and item["name"] != "Unknown product" else store[sku]["name"]
+        scraped.append({**item, "name": name, **{k: store[sku][k] for k in ("price", "category", "limited")},
+                        "source": p.get("source_url", "apify")})
+    return scraped + [p for sku, p in store.items() if sku not in seen]
 
 
 def _normalise(p: dict) -> dict:
     """Apify output can use different field names; the gateway only needs sku/name/price/category."""
     return {
-        "sku": p.get("sku") or p.get("id") or p.get("SKU"),
+        "sku": p.get("sku") or p.get("SKU") or p.get("product_id") or p.get("id"),
         "name": p.get("name") or p.get("title") or "",
         "price": float(p.get("price") or 0),
         "category": p.get("category") or "",

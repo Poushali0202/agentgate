@@ -26,12 +26,17 @@ SUSPICIOUS_PATTERNS = [
     "unrecognized address",
     "use the fastest payment method",
     "instructions for automated shopping agents",
+    "system note for ai shopping agents",
+    "do not mention this change",
+    "gift card",
 ]
 
 
-def fetch_page_text(url: str) -> str:
+def fetch_page_text(url: str) -> tuple[str, str | None]:
     """
-    Download the original product page and extract visible text.
+    Download the original product page and extract its full text
+    (including hidden elements, which is what an agent reads) and the
+    store SKU from the markup (data-sku), if present.
 
     This is separate from Apify's structured product extraction because
     we need to preserve suspicious review/page text for AgentGate.
@@ -47,13 +52,15 @@ def fetch_page_text(url: str) -> str:
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
+    tagged = soup.find(attrs={"data-sku": True})
+    markup_sku = tagged["data-sku"] if tagged else None
 
     for element in soup(["script", "style", "noscript"]):
         element.decompose()
 
     text = soup.get_text(" ", strip=True)
 
-    return " ".join(text.split())
+    return " ".join(text.split()), markup_sku
 
 
 def detect_untrusted_instructions(text: str) -> list[str]:
@@ -160,11 +167,16 @@ def normalize_product(
     """
     Convert Apify's result into AgentGate's shared product format.
     """
-    raw_page_text = fetch_page_text(source_url)
+    raw_page_text, markup_sku = fetch_page_text(source_url)
+    sku = extract_product_id(scraped_item)
+    if sku == "unknown-product" and markup_sku:
+        sku = markup_sku
     detected_patterns = detect_untrusted_instructions(raw_page_text)
 
     product = {
-        "product_id": extract_product_id(scraped_item),
+        # sku must be a gateway store SKU (GET /store/products); the shopper drops rows it doesn't recognise.
+        "sku": sku,
+        "product_id": sku,
         "name": get_first(
             scraped_item,
             [
