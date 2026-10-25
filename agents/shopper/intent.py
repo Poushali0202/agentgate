@@ -5,11 +5,13 @@ safety net, so the demo never depends on the API being reachable. Purchase logic
 """
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 
 from agents.common import env
 
+log = logging.getLogger("agentgate-shopper")
 MODEL = "claude-opus-5-5"
 
 SYSTEM = (
@@ -23,7 +25,7 @@ _PRICE = re.compile(r"(?:under|below|less than|max(?:imum)?|up to|budget(?: of)?
 _QTY = re.compile(r"\b(\d{1,3})\s*(?:x|pcs?|pieces?|units?|of)\b|\b(?:x|qty)\s*(\d{1,3})\b|(?:^|\b(?:buy|order|get|want|need)\s+(?:me\s+)?)(\d{1,3})\b(?!\s*(?:\.\d|%|\$))", re.I)
 _WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "a pair of": 2}
 _FILLER = re.compile(
-    r"\b(please|can you|could you|i want|i'd like|i would like|buy|get|order|purchase|me|a|an|the|some|for|under|below|"
+    r"\b(please|can you|could you|i want|i'd like|i would like|i need|hey|hi|hello|i|we|you|it|buy|get|order|purchase|me|a|an|the|some|for|under|below|"
     r"less than|max|maximum|up to|budget|of|dollars|usd|bucks|cheapest|best)\b",
     re.I,
 )
@@ -41,8 +43,13 @@ class Intent:
         return bool(self.item)
 
 
+_NOT_A_PURCHASE = re.compile(r"^(hi|hello|hey|yo|help|thanks|thank you|start)\b|what (can|do) you do|who are you|how (do|does) (this|you) work", re.I)
+
+
 def parse_fallback(text: str) -> Intent:
     """Regex intent: price after a budget word, an explicit quantity, and whatever is left as the item."""
+    if _NOT_A_PURCHASE.search(text.strip()) and not re.search(r"\b(buy|order|purchase|get me|want|need)\b", text, re.I):
+        return Intent(item=None, max_price=None, qty=1, source="fallback")
     lowered = text.lower()
     max_price = None
     m = re.search(r"(?:under|below|less than|max(?:imum)?|up to|budget(?: of)?)\s*\$?\s*(\d{1,6}(?:\.\d{1,2})?)", lowered)
@@ -103,9 +110,11 @@ async def extract(text: str) -> Intent:
             qty=max(1, min(int(qty), 100)),
             source="claude",
         )
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        log.warning("Claude reply was not usable JSON (%s); using the fallback parser", e.__class__.__name__)
         return parse_fallback(text)
     except Exception as e:  # anthropic.APIStatusError, APIConnectionError, APITimeoutError and friends
         if type(e).__module__.startswith("anthropic"):
+            log.warning("Claude unavailable (%s: %s); using the fallback parser", e.__class__.__name__, str(e)[:160])
             return parse_fallback(text)
         raise
