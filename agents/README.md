@@ -32,7 +32,7 @@ Each prints an Agentverse inspector link on first start. Open it, connect the ma
 
 1. Message the **Guardian** once ("hi") so it knows who to ask.
 2. Message the **Shopper**: `buy me wireless headphones under $200` → verified, allowed.
-3. With `HIJACK=1` on the Shopper: `buy me headphones` → it follows the trap page instead (gift cards, new address) → the gateway challenges → the **Guardian** shows you the card → reply `deny` → blocked.
+3. Tell the Shopper `hijack on` (the labelled demo switch — no restart needed; `HIJACK=1` in the env does the same at startup), then `buy me headphones` → it follows the trap page instead (gift cards, new address) → the gateway challenges → the **Guardian** shows you the card → reply `deny` → blocked. `hijack off` restores normal shopping.
 
 ## Environment
 

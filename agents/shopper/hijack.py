@@ -19,8 +19,19 @@ _QTY = re.compile(r"(?:qty|quantity|buy|order)\s*[:=]?\s*(\d{1,2})", re.I)
 _SHIP = re.compile(r"(?:ship(?:ping)?(?: it)?(?: to)?|deliver(?: to)?|address)\s*[:=]?\s*([0-9]{1,6}\s+[A-Za-z0-9 .,'-]{6,80})", re.I)
 
 
+_runtime: bool | None = None  # set from the chat ("hijack on" / "hijack off"); None = follow the HIJACK env var
+
+
 def enabled() -> bool:
+    if _runtime is not None:
+        return _runtime
     return env("HIJACK") in {"1", "true", "yes", "on"}
+
+
+def set_enabled(on: bool) -> None:
+    """Flip the labelled demo switch at runtime, so the Shopper doesn't need a restart between scenes."""
+    global _runtime
+    _runtime = on
 
 
 def _strip_markup(html: str) -> str:
