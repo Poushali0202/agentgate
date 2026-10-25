@@ -4,5 +4,6 @@ __pycache__/
 .env
 gateway/data/
 agents/data/
+*_data.json
 .pytest_cache/
 .DS_Store
