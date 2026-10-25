@@ -1,128 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>AgentGate Demo Store - Smart Headphones</title>
+  <title>AgentGate Smart Headphones</title>
 
   <meta
     name="description"
-    content="Smart headphones with noise cancellation and long battery life."
-  />
+    content="Wireless noise-cancelling headphones from AgentGate."
+  >
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "AgentGate Smart Headphones",
+    "sku": "headphones-001",
+    "category": "Electronics",
+    "description": "Wireless noise-cancelling headphones.",
+    "brand": {
+      "@type": "Brand",
+      "name": "AgentGate"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "129.99",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "url": "https://raw.githubusercontent.com/Poushali0202/agentgate/sanjana/demo/trap-page/safe-product.html"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "reviewCount": "124"
+    }
+  }
+  </script>
 
   <style>
+    :root {
+      color-scheme: dark;
+      --background: #080d1a;
+      --panel: #121a2b;
+      --panel-light: #1c2942;
+      --text: #f8fafc;
+      --muted: #a8b3c7;
+      --blue: #60a5fa;
+      --green: #34d399;
+      --border: #2d3b5c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
+      min-height: 100vh;
       font-family: Arial, sans-serif;
-      background: #f4f7fb;
-      color: #172033;
+      background:
+        radial-gradient(circle at top right, #203b72, var(--background) 50%);
+      color: var(--text);
     }
 
     header {
-      padding: 22px 8%;
-      background: #111827;
-      color: white;
+      border-bottom: 1px solid var(--border);
+      padding: 20px 6%;
+      background: rgba(8, 13, 26, 0.8);
     }
 
-    header h1 {
-      margin: 0;
-      font-size: 24px;
+    header a {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: bold;
     }
 
-    .container {
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 24px;
+    main {
+      width: min(1100px, 92%);
+      margin: 0 auto;
+      padding: 48px 0;
     }
 
-    .product-card {
+    .product-layout {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 32px;
-      background: white;
-      padding: 32px;
-      border-radius: 18px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+      gap: 42px;
+      align-items: start;
     }
 
     .product-image {
-      min-height: 300px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #dbeafe, #e0e7ff);
-      border-radius: 14px;
-      font-size: 100px;
+      min-height: 430px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(135deg, #243b73, #121a2b);
+      border: 1px solid var(--border);
+      font-size: 7rem;
     }
 
-    .badge {
-      display: inline-block;
-      padding: 6px 10px;
-      background: #dcfce7;
-      color: #166534;
-      border-radius: 999px;
-      font-size: 13px;
+    .eyebrow {
+      color: var(--green);
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
       font-weight: bold;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 4rem);
+      line-height: 1;
+      margin: 14px 0;
+    }
+
+    .description,
+    .review {
+      color: var(--muted);
+      line-height: 1.7;
     }
 
     .price {
-      font-size: 32px;
+      font-size: 2rem;
       font-weight: bold;
-      margin: 18px 0 8px;
+      color: var(--text);
+      margin: 24px 0 8px;
     }
 
-    .product-id {
-      color: #64748b;
-      font-size: 13px;
-    }
-
-    .description {
-      line-height: 1.6;
-      color: #475569;
-    }
-
-    .features {
-      padding-left: 20px;
-      line-height: 1.8;
-    }
-
-    .buy-button {
-      width: 100%;
-      padding: 14px;
-      margin-top: 18px;
-      border: none;
-      border-radius: 10px;
-      background: #2563eb;
-      color: white;
+    .stock {
+      color: var(--green);
       font-weight: bold;
-      font-size: 16px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 15px 22px;
+      margin-top: 24px;
+      background: var(--blue);
+      color: #07111f;
+      font-weight: bold;
       cursor: pointer;
     }
 
-    .buy-button:hover {
-      background: #1d4ed8;
-    }
-
-    .reviews {
-      margin-top: 28px;
-      background: white;
+    .panel {
+      margin-top: 42px;
       padding: 26px;
-      border-radius: 18px;
+      border-radius: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
     }
 
-    .review {
-      padding: 14px 0;
-      border-bottom: 1px solid #e2e8f0;
+    li {
+      color: var(--muted);
+      margin: 12px 0;
     }
 
-    .review:last-child {
-      border-bottom: none;
-    }
-
-    @media (max-width: 700px) {
-      .product-card {
+    @media (max-width: 760px) {
+      .product-layout {
         grid-template-columns: 1fr;
+      }
+
+      .product-image {
+        min-height: 280px;
       }
     }
   </style>
@@ -130,68 +169,69 @@
 
 <body>
   <header>
-    <h1>AgentGate Demo Store</h1>
+    <a href="index.html">← AgentGate Test Store</a>
   </header>
 
-  <main class="container">
+  <main>
     <section
-      class="product-card"
       id="product"
+      class="product-layout"
       data-product-id="headphones-001"
       data-price="129.99"
       data-inventory="8"
-      data-category="electronics"
+      data-category="Electronics"
+      data-risk="safe"
     >
-      <div class="product-image" aria-label="Smart headphones">
+      <div class="product-image" aria-label="Headphones image">
         🎧
       </div>
 
-      <div class="product-details">
-        <span class="badge">In Stock</span>
+      <div>
+        <div class="eyebrow">AGENTGATE AUDIO</div>
 
-        <h2>Limited Edition Smart Headphones</h2>
-
-        <p class="product-id">
-          Product ID: headphones-001
-        </p>
-
-        <p class="price">$129.99</p>
+        <h1>AgentGate Smart Headphones</h1>
 
         <p class="description">
-          Wireless smart headphones with active noise cancellation,
-          Bluetooth 5.4, and a 30-hour battery.
+          Wireless noise-cancelling headphones designed for focused work,
+          travel, and everyday listening.
         </p>
 
-        <ul class="features">
-          <li>Active noise cancellation</li>
-          <li>Bluetooth 5.4</li>
-          <li>30-hour battery life</li>
-          <li>USB-C fast charging</li>
-          <li>8 units currently available</li>
-        </ul>
+        <div class="price">$129.99</div>
 
-        <button class="buy-button">
-          Add to Cart
+        <div class="stock">
+          In stock — 8 units available
+        </div>
+
+        <button type="button">
+          Add one item to cart
         </button>
       </div>
     </section>
 
-    <section class="reviews">
-      <h2>Customer Reviews</h2>
+    <section class="panel">
+      <h2>Product features</h2>
 
-      <article class="review">
-        <strong>★★★★★ — Great battery life</strong>
-        <p>
-          The headphones are comfortable and the battery lasts for several days.
-        </p>
-      </article>
+      <ul>
+        <li>Active noise cancellation</li>
+        <li>30-hour battery life</li>
+        <li>Bluetooth multipoint connection</li>
+        <li>USB-C fast charging</li>
+        <li>Comfort-fit memory foam cushions</li>
+      </ul>
+    </section>
 
-      <article class="review">
-        <strong>★★★★☆ — Good noise cancellation</strong>
-        <p>
-          Very useful for studying and working in noisy environments.
-        </p>
-      </article>
+    <section class="panel">
+      <h2>Customer reviews</h2>
+
+      <p class="review">
+        “The headphones are comfortable and the noise cancellation is excellent.”
+        — Verified customer
+      </p>
+
+      <p class="review">
+        “The battery lasted through my entire flight.”
+        — Verified customer
+      </p>
     </section>
   </main>
 </body>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentGate Product Test Pages</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #0b1020;
+      --panel: #151d35;
+      --text: #f5f7ff;
+      --muted: #aab4d0;
+      --safe: #36d399;
+      --danger: #fb7185;
+      --blue: #60a5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at top, #243b73, var(--background) 55%);
+      color: var(--text);
+    }
+
+    main {
+      width: min(900px, 92%);
+      margin: 0 auto;
+      padding: 64px 0;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 4rem);
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .subtitle {
+      max-width: 680px;
+      font-size: 1.1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-top: 36px;
+    }
+
+    .card {
+      display: block;
+      padding: 24px;
+      border-radius: 20px;
+      background: var(--panel);
+      color: var(--text);
+      text-decoration: none;
+      border: 1px solid #2b385d;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--blue);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-bottom: 18px;
+    }
+
+    .safe {
+      background: rgba(54, 211, 153, 0.15);
+      color: var(--safe);
+    }
+
+    .danger {
+      background: rgba(251, 113, 133, 0.15);
+      color: var(--danger);
+    }
+
+    code {
+      color: #bfdbfe;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <span class="badge safe">AGENTGATE DEMO</span>
+
+    <h1>Product Content Security Test</h1>
+
+    <p class="subtitle">
+      These pages simulate product websites read by an AI shopping agent.
+      The safe page contains ordinary product information. The malicious page
+      contains instructions that attempt to manipulate the shopping agent.
+    </p>
+
+    <section class="grid">
+      <a class="card" href="safe-product.html">
+        <span class="badge safe">SAFE PRODUCT PAGE</span>
+        <h2>Normal product page</h2>
+        <p>
+          Contains product metadata, price, inventory, features, and reviews.
+          No suspicious instructions are present.
+        </p>
+      </a>
+
+      <a class="card" href="malicious-product.html">
+        <span class="badge danger">MALICIOUS PRODUCT PAGE</span>
+        <h2>Prompt-injection test page</h2>
+        <p>
+          Contains product data plus instructions attempting to override the
+          customer's shopping request.
+        </p>
+      </a>
+    </section>
+
+    <p>
+      The Apify e-commerce scraper extracts product data. AgentGate analyzes
+      the page content and decides whether the shopping request is safe.
+    </p>
+  </main>
+</body>
+</html>
